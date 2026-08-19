@@ -871,6 +871,24 @@ bool EditorContext::openProjectAt(const std::string& root) {
     if (pick.empty()) log("opened project " + root + " (no graphs yet)");
     else              openDoc(pick);
 
+    if (project.isEngine()) {
+        std::string scene;
+        if (!project.startScene.empty()) {
+            const fs::path s = fs::path(root) / project.startScene;
+            if (fs::exists(s, ec)) scene = s.string();
+        }
+        if (scene.empty())
+            for (const std::string& f : project.sceneFiles) {
+                if (fs::path(f).extension() == ".limeprefab") continue;
+                scene = f;
+                break;
+            }
+        if (scene.empty())
+            note(NoteKind::Warning, "no scene in this project yet");
+        else
+            openScene(scene);
+    }
+
     log(std::string("mode: ") + projectModeName(project.mode));
     return true;
 }

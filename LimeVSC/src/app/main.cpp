@@ -709,7 +709,7 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR cmdLine, int) {
         wchar_t buf[MAX_PATH]{};
         GetModuleFileNameW(nullptr, buf, MAX_PATH);
         iniPath = (std::filesystem::path(buf).parent_path()
-                   / "limevsc-layout-v7.ini").string();
+                   / "limevsc-layout-v8.ini").string();
         io.IniFilename = iniPath.c_str();
     }
     bool buildLayout = !std::filesystem::exists(iniPath);
@@ -858,6 +858,10 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR cmdLine, int) {
                 ImGui::SetNextWindowDockID(home, ImGuiCond_FirstUseEver);
 
             if (ImGui::Begin(title.c_str(), &open)) {
+                if (title == "Viewport") {
+                    ImGuiWindow* w = ImGui::GetCurrentWindow();
+                    if (w->DockOrder > 0) w->DockOrder = 0;
+                }
                 if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
                     statusSetArea(title.c_str());
                 p->draw(ed);
