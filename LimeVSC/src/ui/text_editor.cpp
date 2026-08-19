@@ -187,8 +187,6 @@ int resizeCallback(ImGuiInputTextCallbackData* data) {
 void drawTextDocument(EditorContext& e) {
     GraphDoc& d = e.doc();
 
-    if (ImGui::SmallButton("Save")) e.saveText();
-    ImGui::SameLine();
     ImGui::TextDisabled("%s%s", d.displayName().c_str(), d.dirty ? " *" : "");
     ImGui::SameLine();
     ImGui::TextDisabled("| %d lines", g_lineCount);
