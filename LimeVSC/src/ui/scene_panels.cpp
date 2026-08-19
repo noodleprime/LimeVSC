@@ -114,16 +114,32 @@ bool drawBehaviourPicker(EditorContext& e, const char* label,
             out = fmtLuaString("");
             changed = true;
         }
-        for (const std::vector<std::string>* list :
-             {&e.project.limeFiles, &e.project.luaFiles})
-            for (const std::string& f : *list) {
-                if (list == &e.project.luaFiles && e.isGeneratedLua(f)) continue;
+        const auto cooked = [](const std::string& p) {
+            const std::string n = fs::path(p).filename().string();
+            if (n == "lime_boot.lua" || n == "lime_scene.lua") return true;
+            return n.size() > 10
+                   && n.compare(n.size() - 10, 10, "_scene.lua") == 0;
+        };
+
+        const auto section = [&](const char* title,
+                                 const std::vector<std::string>& list,
+                                 bool skipGenerated) {
+            bool header = false;
+            for (const std::string& f : list) {
+                if (skipGenerated && (e.isGeneratedLua(f) || cooked(f))) continue;
+                if (!header) {
+                    ImGui::SeparatorText(title);
+                    header = true;
+                }
                 const std::string r = rel(f);
                 if (ImGui::Selectable(r.c_str(), r == shown)) {
                     out = fmtLuaString(r);
                     changed = true;
                 }
             }
+        };
+        section("Graphs", e.project.limeFiles, false);
+        section("Scripts", e.project.luaFiles, true);
         ImGui::EndCombo();
     }
     ImGui::PopID();
