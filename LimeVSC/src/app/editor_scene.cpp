@@ -179,6 +179,29 @@ void EditorContext::newPrefab(const std::string& path, const std::string& name) 
     saveScene();
 }
 
+void EditorContext::forgetDeleted(const std::string& path) {
+    const std::string gone = fs::path(path).lexically_normal().generic_string();
+    const auto under = [&](const std::string& other) {
+        if (other.empty()) return false;
+        const std::string o =
+            fs::path(other).lexically_normal().generic_string();
+        return o == gone || (o.size() > gone.size() && o.compare(0, gone.size(), gone) == 0
+                             && o[gone.size()] == '/');
+    };
+
+    for (std::size_t i = docs.size(); i-- > 0;)
+        if (under(docs[i]->filePath)) closeDoc(i);
+
+    if (under(scenePath)) {
+        scene.clear();
+        sceneUndo.clear();
+        scenePath.clear();
+        selectedEntity = {};
+        sceneDirty = false;
+        inspecting = Inspecting::Node;
+    }
+}
+
 bool EditorContext::editingPrefab() const {
     return scenePath.size() > 11
            && scenePath.compare(scenePath.size() - 11, 11, ".limeprefab") == 0;

@@ -467,3 +467,47 @@ TEST_CASE("a scene is not mistaken for a prefab") {
     ed.scenePath.clear();
     CHECK_FALSE(ed.editingPrefab());
 }
+
+TEST_CASE("deleting the open scene unloads it") {
+    EditorContext ed;
+    ed.scenePath = "C:/game/content/Scenes/main.limescene";
+    ed.scene.name = "Main";
+    ed.addEntity("Thing", {});
+    ed.sceneDirty = true;
+
+    ed.forgetDeleted("C:/game/content/Scenes/main.limescene");
+    CHECK(ed.scenePath.empty());
+    CHECK(ed.scene.size() == 0);
+    CHECK_FALSE(ed.sceneDirty);
+}
+
+TEST_CASE("deleting a folder unloads what was open inside it") {
+    EditorContext ed;
+    ed.scenePath = "C:/game/content/Scenes/main.limescene";
+    ed.addEntity("Thing", {});
+
+    ed.forgetDeleted("C:/game/content/Scenes");
+    CHECK(ed.scenePath.empty());
+}
+
+TEST_CASE("deleting an unrelated path leaves the scene alone") {
+    EditorContext ed;
+    ed.scenePath = "C:/game/content/Scenes/main.limescene";
+
+    ed.forgetDeleted("C:/game/content/Scenes2");
+    CHECK(ed.scenePath == "C:/game/content/Scenes/main.limescene");
+    ed.forgetDeleted("C:/game/content/Scenes/other.limescene");
+    CHECK(ed.scenePath == "C:/game/content/Scenes/main.limescene");
+}
+
+TEST_CASE("deleting an open document closes its tab") {
+    EditorContext ed;
+    ed.docs[0]->filePath = "C:/game/content/Graphs/main.lime";
+    ed.addDoc();
+    ed.docs[1]->filePath = "C:/game/content/Graphs/other.lime";
+    REQUIRE(ed.docs.size() == 2);
+
+    ed.forgetDeleted("C:/game/content/Graphs/other.lime");
+    REQUIRE(ed.docs.size() == 1);
+    CHECK(ed.docs[0]->filePath == "C:/game/content/Graphs/main.lime");
+}

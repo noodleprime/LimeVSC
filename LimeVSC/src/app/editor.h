@@ -286,6 +286,7 @@ public:
     bool   saveEntityAsPrefab(EntityId id, const std::string& path);
     void   newPrefab(const std::string& path, const std::string& name);
     bool   editingPrefab() const;
+    void   forgetDeleted(const std::string& path);
     bool   instantiatePrefab(const std::string& path, EntityId parent);
     void   rescanAssets();
     void   queueAssetScan();

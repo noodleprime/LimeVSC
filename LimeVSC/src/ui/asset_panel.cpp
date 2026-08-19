@@ -434,12 +434,14 @@ private:
                     fs::remove(gen + ".map", gec);
                 }
             }
-            if (dec)
+            if (dec) {
                 e.note(EditorContext::NoteKind::Error,
                        "could not delete " + fileName(deleteTarget));
-            else
+            } else {
+                e.forgetDeleted(deleteTarget);
                 e.note(EditorContext::NoteKind::Action,
                        "Deleted " + fileName(deleteTarget));
+            }
             e.project.scan();
             e.rescanAssets();
             deleteTarget.clear();
