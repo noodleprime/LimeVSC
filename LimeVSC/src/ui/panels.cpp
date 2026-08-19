@@ -1474,6 +1474,15 @@ std::string sanitise(std::string s);
 std::string uniqueVarName(const Graph& g);
 std::string defaultFor(const std::string& type);
 
+int varUses(const Graph& g, const std::string& name) {
+    const std::string get = graphVarGetId(g.moduleName, name);
+    const std::string set = graphVarSetId(g.moduleName, name);
+    int n = 0;
+    for (const Node& nd : g.nodes())
+        if (nd.type == get || nd.type == set) ++n;
+    return n;
+}
+
 void drawVariables(EditorContext& e) {
     if (!ImGui::CollapsingHeader("Variables", ImGuiTreeNodeFlags_DefaultOpen))
         return;
@@ -1496,6 +1505,11 @@ void drawVariables(EditorContext& e) {
         return;
     }
 
+    static std::string dropName;
+    static int         dropIndex = -1;
+    static int         dropUses = 0;
+    static bool        askDrop = false;
+
     int removeAt = -1;
     for (std::size_t i = 0; i < g.variables.size(); ++i) {
         VarDecl& v = g.variables[i];
@@ -1510,10 +1524,19 @@ void drawVariables(EditorContext& e) {
 
         const float xw = ImGui::GetFrameHeight();
         ImGui::SameLine(ImGui::GetContentRegionMax().x - xw);
-        if (ImGui::SmallButton("x")) removeAt = static_cast<int>(i);
+        if (ImGui::SmallButton("x")) {
+            const int uses = varUses(g, v.name);
+            if (uses > 0) {
+                dropName = v.name;
+                dropIndex = static_cast<int>(i);
+                dropUses = uses;
+                askDrop = true;
+            } else {
+                removeAt = static_cast<int>(i);
+            }
+        }
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Remove. Any Get or Set node still using it "
-                              "will report an error until you delete it.");
+            ImGui::SetTooltip("Remove this variable");
 
         if (!open) {
             ImGui::PopID();
@@ -1553,7 +1576,34 @@ void drawVariables(EditorContext& e) {
         ImGui::PopID();
     }
 
-    if (removeAt >= 0) {
+    if (askDrop) {
+        ImGui::OpenPopup("Remove variable");
+        askDrop = false;
+    }
+    ImGui::SetNextWindowSizeConstraints(ImVec2(400, 0), ImVec2(400, FLT_MAX));
+    if (ImGui::BeginPopupModal("Remove variable", nullptr,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextWrapped("%s is used by %d node%s in this graph.",
+                           dropName.c_str(), dropUses,
+                           dropUses == 1 ? "" : "s");
+        ImGui::Spacing();
+        ImGui::TextColored(ImVec4(0.89f, 0.66f, 0.29f, 1.0f),
+                           "They will report an error until you delete them");
+        ImGui::Separator();
+        if (ImGui::Button("Remove anyway", ImVec2(140, 0))) {
+            removeAt = dropIndex;
+            dropIndex = -1;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(120, 0))) {
+            dropIndex = -1;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
+    if (removeAt >= 0 && removeAt < static_cast<int>(g.variables.size())) {
         g.variables.erase(g.variables.begin() + removeAt);
         commit(e);
     }
