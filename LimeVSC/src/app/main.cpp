@@ -404,7 +404,6 @@ void drawSettings(EditorContext& ed) {
         return;
 
     ImGui::SeparatorText("Projects");
-    ImGui::TextDisabled("Where New Project starts.");
     char dir[512];
     std::snprintf(dir, sizeof(dir), "%s", ed.settings.projectsDir.c_str());
     ImGui::SetNextItemWidth(-90);
@@ -455,14 +454,12 @@ void drawSettings(EditorContext& ed) {
     ImGui::SeparatorText("Undo");
     int steps = static_cast<int>(ed.settings.undoLimit);
     ImGui::SetNextItemWidth(-1);
-    if (ImGui::DragInt("##undo", &steps, 1.0f, 0,
-                       static_cast<int>(AppSettings::kMaxUndoLimit),
-                       steps == 0 ? "Unlimited" : "%d edits",
-                       ImGuiSliderFlags_AlwaysClamp)) {
-        ed.settings.undoLimit = static_cast<std::size_t>(std::max(0, steps));
+    if (ImGui::InputInt("##undo", &steps, 1, 10,
+                        ImGuiInputTextFlags_CharsDecimal)) {
+        steps = std::clamp(steps, 0, static_cast<int>(AppSettings::kMaxUndoLimit));
+        ed.settings.undoLimit = static_cast<std::size_t>(steps);
         ed.trimHistory();
     }
-    ImGui::TextDisabled("Counted across every open document, not per tab.");
 
     ImGui::Spacing();
     ImGui::Separator();
