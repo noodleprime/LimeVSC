@@ -209,14 +209,171 @@ void drawHighlight(const std::string& text, ImVec2 origin, float lineHeight,
     (void)spaceW;
 }
 
-int resizeCallback(ImGuiInputTextCallbackData* data) {
-    if (data->EventFlag != ImGuiInputTextFlags_CallbackResize) return 0;
-    auto* str = static_cast<std::string*>(data->UserData);
-    str->resize(static_cast<std::size_t>(data->BufTextLen));
-    data->Buf = str->data();
+struct Completion {
+    std::string label;
+    const char* kind;
+};
+
+std::string wordBefore(const std::string& text, int at) {
+    int i = at;
+    while (i > 0 && isIdentChar(text[static_cast<std::size_t>(i) - 1])) --i;
+    return text.substr(static_cast<std::size_t>(i),
+                       static_cast<std::size_t>(at - i));
+}
+
+void gatherWords(const std::string& text, const std::string& skip,
+                 std::vector<Completion>& out) {
+    std::size_t i = 0;
+    while (i < text.size()) {
+        if (!isIdentChar(text[i])) {
+            ++i;
+            continue;
+        }
+        const std::size_t b = i;
+        while (i < text.size() && isIdentChar(text[i])) ++i;
+        std::string w = text.substr(b, i - b);
+        if (w == skip || w.size() < 3) continue;
+        if (std::isdigit(static_cast<unsigned char>(w[0]))) continue;
+        if (isKeyword(w)) continue;
+        bool seen = false;
+        for (const Completion& c : out)
+            if (c.label == w) { seen = true; break; }
+        if (!seen) out.push_back({std::move(w), "word"});
+    }
+}
+
+std::vector<Completion> completionsFor(const EditorContext& e,
+                                       const std::string& prefix) {
+    std::vector<Completion> all;
+    if (prefix.empty()) return all;
+
+    if (wantsLua(e)) {
+        for (const char* k : kKeywords)
+            if (std::string_view(k).compare(0, prefix.size(), prefix) == 0)
+                all.push_back({k, "keyword"});
+        for (const NodeDesc& d : e.nodes.all()) {
+            if (d.target.empty()) continue;
+            if (d.target.compare(0, prefix.size(), prefix) != 0) continue;
+            bool seen = false;
+            for (const Completion& c : all)
+                if (c.label == d.target) { seen = true; break; }
+            if (!seen) all.push_back({d.target, "lime"});
+        }
+    }
+
+    std::vector<Completion> words;
+    gatherWords(e.doc().text, prefix, words);
+    for (Completion& w : words)
+        if (w.label.compare(0, prefix.size(), prefix) == 0)
+            all.push_back(std::move(w));
+
+    if (all.size() > 12) all.resize(12);
+    return all;
+}
+
+int g_completeAt = -1;
+int g_completePick = 0;
+std::string g_completePrefix;
+std::vector<Completion> g_completions;
+bool g_completeInsert = false;
+std::string g_completeChosen;
+
+int editCallback(ImGuiInputTextCallbackData* data) {
+    if (data->EventFlag == ImGuiInputTextFlags_CallbackResize) {
+        auto* str = static_cast<std::string*>(data->UserData);
+        str->resize(static_cast<std::size_t>(data->BufTextLen));
+        data->Buf = str->data();
+        return 0;
+    }
+    if (data->EventFlag == ImGuiInputTextFlags_CallbackAlways) {
+        if (g_completeInsert) {
+            g_completeInsert = false;
+            const int from = data->CursorPos
+                             - static_cast<int>(g_completePrefix.size());
+            if (from >= 0) {
+                data->DeleteChars(from,
+                                  static_cast<int>(g_completePrefix.size()));
+                data->InsertChars(from, g_completeChosen.c_str());
+            }
+            g_completeAt = -1;
+            return 0;
+        }
+        g_completeAt = data->CursorPos;
+    }
     return 0;
 }
 
+
+}
+
+void drawCompletions(EditorContext& e, bool active, ImVec2 boxOrigin,
+                     float lineHeight, ImVec2 pad, float scroll) {
+    if (!active || g_completeAt < 0) {
+        g_completions.clear();
+        return;
+    }
+
+    const std::string& text = e.doc().text;
+    const int at = std::min(g_completeAt, static_cast<int>(text.size()));
+    const std::string prefix = wordBefore(text, at);
+    if (prefix.size() < 2) {
+        g_completions.clear();
+        return;
+    }
+    if (prefix != g_completePrefix) {
+        g_completePrefix = prefix;
+        g_completions = completionsFor(e, prefix);
+        g_completePick = 0;
+    }
+    if (g_completions.empty()) return;
+
+    const int count = static_cast<int>(g_completions.size());
+    if (ImGui::IsKeyPressed(ImGuiKey_DownArrow, true))
+        g_completePick = (g_completePick + 1) % count;
+    if (ImGui::IsKeyPressed(ImGuiKey_UpArrow, true))
+        g_completePick = (g_completePick + count - 1) % count;
+    if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+        g_completions.clear();
+        return;
+    }
+    if (ImGui::IsKeyPressed(ImGuiKey_Tab)
+        || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+        g_completeChosen = g_completions[static_cast<std::size_t>(g_completePick)].label;
+        g_completeInsert = true;
+        g_completions.clear();
+        return;
+    }
+
+    int line = 0, col = 0;
+    for (int i = 0; i < at; ++i) {
+        if (text[static_cast<std::size_t>(i)] == '\n') { ++line; col = 0; }
+        else ++col;
+    }
+    const float charW = ImGui::CalcTextSize("M").x;
+    const ImVec2 at2(boxOrigin.x + pad.x + static_cast<float>(col) * charW,
+                     boxOrigin.y + pad.y - scroll
+                         + static_cast<float>(line + 1) * lineHeight);
+
+    ImGui::SetNextWindowPos(at2);
+    ImGui::SetNextWindowBgAlpha(0.98f);
+    if (ImGui::Begin("##complete", nullptr,
+                     ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs
+                         | ImGuiWindowFlags_AlwaysAutoResize
+                         | ImGuiWindowFlags_NoSavedSettings
+                         | ImGuiWindowFlags_NoFocusOnAppearing
+                         | ImGuiWindowFlags_NoNav)) {
+        for (int i = 0; i < count; ++i) {
+            const Completion& c = g_completions[static_cast<std::size_t>(i)];
+            const bool on = i == g_completePick;
+            if (on)
+                ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(160, 225, 130, 255));
+            ImGui::TextUnformatted(c.label.c_str());
+            if (on) ImGui::PopStyleColor();
+            ImGui::SameLine();
+            ImGui::TextDisabled("%s", c.kind);
+        }
+    }
+    ImGui::End();
 }
 
 void drawTextDocument(EditorContext& e) {
@@ -269,8 +426,10 @@ void drawTextDocument(EditorContext& e) {
     const bool edited = ImGui::InputTextMultiline(
         "##lua", d.text.data(), d.text.capacity() + 1, boxSize,
         ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_CallbackResize
+            | ImGuiInputTextFlags_CallbackAlways
             | ImGuiInputTextFlags_NoHorizontalScroll,
-        resizeCallback, &d.text);
+        editCallback, &d.text);
+    const bool boxActive = ImGui::IsItemActive();
 
     if (ImGuiWindow* box = ImGui::FindWindowByName("##lua")) syncedScroll = box->Scroll.y;
 
@@ -292,6 +451,8 @@ void drawTextDocument(EditorContext& e) {
                       lineHeight, syncedScroll, avail.y);
     else
         countLines(d.text);
+
+    drawCompletions(e, boxActive, cursorBefore, lineHeight, pad, syncedScroll);
 
     if (ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)
         && ImGui::GetIO().KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S)) {
