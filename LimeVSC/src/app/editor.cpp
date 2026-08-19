@@ -639,6 +639,9 @@ void EditorContext::seedStartScene() {
     }
 
     const NodeId scene = graph().addNode(d->id, 320.0f, 150.0f);
+    if (!sceneModuleName(project).empty())
+        if (Node* n = graph().node(scene))
+            n->values.push_back({"module", "\"content.lime_boot\""});
     graph().connect(PinId::make(start, "out"), PinId::make(scene, "in"),
                   PinKind::Exec);
     dirty() = true;
