@@ -1484,10 +1484,15 @@ int varUses(const Graph& g, const std::string& name) {
 }
 
 void drawVariables(EditorContext& e) {
-    if (!ImGui::CollapsingHeader("Variables", ImGuiTreeNodeFlags_DefaultOpen))
-        return;
-
     Graph& g = e.graph();
+
+    const float addW = ImGui::CalcTextSize("+ Add").x
+                       + ImGui::GetStyle().FramePadding.x * 2.0f;
+    const float lineW = ImGui::GetContentRegionAvail().x;
+    const bool shown =
+        ImGui::CollapsingHeader("Variables", ImGuiTreeNodeFlags_DefaultOpen
+                                                 | ImGuiTreeNodeFlags_AllowOverlap);
+    ImGui::SameLine(lineW - addW);
     if (ImGui::SmallButton("+ Add")) {
         VarDecl v;
         v.name = uniqueVarName(g);
@@ -1499,6 +1504,7 @@ void drawVariables(EditorContext& e) {
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip("Declare a variable this graph owns. Get and Set "
                           "nodes for it appear in the node search.");
+    if (!shown) return;
 
     if (g.variables.empty()) {
         ImGui::TextDisabled("No variables");
@@ -1521,6 +1527,21 @@ void drawVariables(EditorContext& e) {
             "%s", v.name.c_str());
         ImGui::SameLine();
         ImGui::TextDisabled("%s", v.type.c_str());
+
+        if (ImGui::BeginPopupContextItem("vctx")) {
+            if (ImGui::MenuItem("Delete")) {
+                const int uses = varUses(g, v.name);
+                if (uses > 0) {
+                    dropName = v.name;
+                    dropIndex = static_cast<int>(i);
+                    dropUses = uses;
+                    askDrop = true;
+                } else {
+                    removeAt = static_cast<int>(i);
+                }
+            }
+            ImGui::EndPopup();
+        }
 
         const float xw = ImGui::GetFrameHeight();
         ImGui::SameLine(ImGui::GetContentRegionMax().x - xw);
