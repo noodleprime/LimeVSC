@@ -35,6 +35,8 @@ void statusSetArea(const char* area);
 void statusSetItemHover();
 
 std::string pickFolder(const char* title, const std::string& startAt = {});
+
+std::string shortProjectPath(const std::string& root);
 void statusInitLogo(void* d3d11Device);
 ImTextureID statusLogo();
 void* createLogoTexture(void* d3d11Device);

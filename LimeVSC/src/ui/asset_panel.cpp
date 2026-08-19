@@ -127,23 +127,6 @@ private:
         if (!pick.empty()) e.queueOpenProject(pick);
     }
 
-    static std::string shownRoot(const std::string& root) {
-        namespace fs = std::filesystem;
-        if (root.empty()) return root;
-
-        const fs::path def(AppSettings::defaultProjectsDir());
-        if (def.empty()) return root;
-
-        const fs::path under = fs::path(root).lexically_relative(def);
-        if (under.empty() || under.native().rfind(L"..", 0) == 0) return root;
-
-        const fs::path base = def.parent_path().parent_path();
-        if (base.empty()) return root;
-        const fs::path shown = fs::path(root).lexically_relative(base);
-        if (shown.empty() || shown.native().rfind(L"..", 0) == 0) return root;
-        return shown.string();
-    }
-
     void drawToolbar(EditorContext& e) {
         struct BuildAction {
             const char* label;
@@ -189,7 +172,7 @@ private:
 
         ImGui::SameLine();
         ImGui::AlignTextToFramePadding();
-        ImGui::TextDisabled("%s", shownRoot(e.project.root).c_str());
+        ImGui::TextDisabled("%s", shortProjectPath(e.project.root).c_str());
 
         if (ImGui::BeginPopup("buildmore")) {
             for (int i = 0; i < IM_ARRAYSIZE(kActions); ++i)
@@ -911,6 +894,23 @@ std::vector<std::unique_ptr<IPanel>> makeAssetPanels() {
     std::vector<std::unique_ptr<IPanel>> v;
     v.push_back(std::make_unique<ContentPanel>());
     return v;
+}
+
+std::string shortProjectPath(const std::string& root) {
+    namespace fs = std::filesystem;
+    if (root.empty()) return root;
+
+    const fs::path def(AppSettings::defaultProjectsDir());
+    if (def.empty()) return root;
+
+    const fs::path under = fs::path(root).lexically_relative(def);
+    if (under.empty() || under.native().rfind(L"..", 0) == 0) return root;
+
+    const fs::path base = def.parent_path().parent_path();
+    if (base.empty()) return root;
+    const fs::path shown = fs::path(root).lexically_relative(base);
+    if (shown.empty() || shown.native().rfind(L"..", 0) == 0) return root;
+    return shown.string();
 }
 
 }

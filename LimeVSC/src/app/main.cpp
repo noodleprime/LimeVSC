@@ -398,8 +398,10 @@ void drawWelcome(EditorContext& ed) {
             ImDrawList* dl = ImGui::GetWindowDrawList();
             dl->AddText(ImVec2(at.x + 6.0f, at.y + 3.0f),
                         there ? nameCol : dimCol, name.c_str());
+            const std::string shown =
+                there ? shortProjectPath(r) : std::string("missing");
             dl->AddText(ImVec2(at.x + 6.0f, at.y + 3.0f + lineH), dimCol,
-                        there ? r.c_str() : "missing");
+                        shown.c_str());
             ImGui::PopID();
         }
 
