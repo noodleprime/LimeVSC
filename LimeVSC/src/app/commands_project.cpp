@@ -199,6 +199,9 @@ end)
 
 Lime.onUpdate:hook(function(dt)
 end)
+
+Lime.onClose:hook(function()
+end)
 )LUA";
         std::ofstream f(p, std::ios::binary);
         if (f) f.write(body.data(), static_cast<std::streamsize>(body.size()));
