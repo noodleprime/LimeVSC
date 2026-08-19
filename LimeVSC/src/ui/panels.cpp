@@ -20,6 +20,7 @@ namespace ed = ax::NodeEditor;
 namespace lime {
 namespace {
 
+void commit(EditorContext& e);
 std::string uniqueVarName(const Graph& g);
 std::string defaultFor(const std::string& type);
 
@@ -994,13 +995,13 @@ private:
         if (v.type.empty() || v.type == "any") v.type = "number";
         v.defaultValue = defaultFor(v.type);
         g.variables.push_back(v);
-        e.rebuildGraphFunctions();
+        commit(e);
 
         const NodeDesc* d =
             e.nodes.find(graphVarGetId(g.moduleName, v.name));
         if (!d) {
             e.note(EditorContext::NoteKind::Warning,
-                   "made " + v.name + " but its node is not ready yet");
+                   "save this graph before making variables from a wire");
             g_pending = {};
             return;
         }
