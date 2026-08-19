@@ -18,6 +18,7 @@
 #include <windows.h>
 
 #include <algorithm>
+#include <cfloat>
 #include <cctype>
 #include <cstdlib>
 #include <filesystem>
@@ -270,7 +271,7 @@ void drawLoading(EditorContext& ed) {
 
     const ImGuiViewport* vp = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(vp->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-    ImGui::SetNextWindowSize(ImVec2(420, 0), ImGuiCond_Always);
+    ImGui::SetNextWindowSizeConstraints(ImVec2(420, 0), ImVec2(420, FLT_MAX));
     ImGui::OpenPopup("Loading##modal");
 
     if (ImGui::BeginPopupModal("Loading##modal", nullptr,
@@ -293,12 +294,111 @@ void drawLoading(EditorContext& ed) {
 bool        g_showSettings = false;
 std::string g_pendingRecent;
 
+void drawNewProject(EditorContext& ed) {
+    static char        name[128] = "";
+    static std::string where;
+    static bool        engine = true;
+    static bool        primed = false;
+
+    if (ed.showNewProject) {
+        ed.showNewProject = false;
+        std::snprintf(name, sizeof(name), "%s", "MyGame");
+        where = ed.settings.projectsDir.empty()
+                    ? AppSettings::defaultProjectsDir()
+                    : ed.settings.projectsDir;
+        engine = true;
+        primed = true;
+        ImGui::OpenPopup("New Project");
+    }
+
+    ImGui::SetNextWindowSizeConstraints(ImVec2(560, 0), ImVec2(560, FLT_MAX));
+    if (!ImGui::BeginPopupModal("New Project", nullptr,
+                                ImGuiWindowFlags_AlwaysAutoResize))
+        return;
+
+    ImGui::SeparatorText("Name");
+    ImGui::SetNextItemWidth(-1);
+    if (primed) {
+        ImGui::SetKeyboardFocusHere();
+        primed = false;
+    }
+    ImGui::InputText("##name", name, sizeof(name));
+
+    ImGui::Spacing();
+    ImGui::SeparatorText("Location");
+    char dir[512];
+    std::snprintf(dir, sizeof(dir), "%s", where.c_str());
+    ImGui::SetNextItemWidth(-90);
+    if (ImGui::InputText("##where", dir, sizeof(dir))) where = dir;
+    ImGui::SameLine();
+    if (ImGui::Button("Browse", ImVec2(80, 0))) {
+        const std::string picked =
+            pickFolder("Where should the project live?", where);
+        if (!picked.empty()) where = picked;
+    }
+
+    ImGui::Spacing();
+    ImGui::SeparatorText("Mode");
+    if (ImGui::RadioButton("Engine", engine)) engine = true;
+    ImGui::TextDisabled(
+        "Standard modern engine experience with systems provided");
+    ImGui::Spacing();
+    if (ImGui::RadioButton("Framework", !engine)) engine = false;
+    ImGui::TextDisabled("Barebones with just the framework of Lime");
+
+    std::string trimmed(name);
+    while (!trimmed.empty() && std::isspace(static_cast<unsigned char>(trimmed.back())))
+        trimmed.pop_back();
+
+    std::filesystem::path target;
+    if (!trimmed.empty() && !where.empty())
+        target = std::filesystem::path(where) / trimmed;
+
+    std::string problem;
+    if (trimmed.empty()) {
+        problem = "Give the project a name.";
+    } else if (where.empty()) {
+        problem = "Choose where it should live.";
+    } else if (trimmed.find_first_of("\\/:*?\"<>|") != std::string::npos) {
+        problem = "A name cannot contain \\ / : * ? \" < > or |";
+    } else {
+        std::error_code ec;
+        if (std::filesystem::exists(target, ec)
+            && !std::filesystem::is_empty(target, ec))
+            problem = "That folder already exists and is not empty.";
+    }
+
+    ImGui::Spacing();
+    ImGui::Separator();
+    if (!target.empty())
+        ImGui::TextDisabled("%s", target.string().c_str());
+    else
+        ImGui::TextDisabled(" ");
+
+    if (!problem.empty())
+        ImGui::TextColored(ImVec4(0.89f, 0.36f, 0.33f, 1.0f), "%s",
+                           problem.c_str());
+    else
+        ImGui::TextDisabled(" ");
+
+    ImGui::BeginDisabled(!problem.empty());
+    if (ImGui::Button("Create", ImVec2(120, 0))) {
+        ed.createProjectAt(target.string(),
+                           engine ? ProjectMode::Engine : ProjectMode::Framework);
+        ImGui::CloseCurrentPopup();
+    }
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    if (ImGui::Button("Cancel", ImVec2(120, 0))) ImGui::CloseCurrentPopup();
+    ImGui::EndPopup();
+}
+
 void drawSettings(EditorContext& ed) {
     if (g_showSettings) {
         ImGui::OpenPopup("Settings");
         g_showSettings = false;
     }
-    ImGui::SetNextWindowSize(ImVec2(560, 0), ImGuiCond_Appearing);
+    ImGui::SetNextWindowSizeConstraints(ImVec2(560, 0), ImVec2(560, FLT_MAX));
     if (!ImGui::BeginPopupModal("Settings", nullptr,
                                 ImGuiWindowFlags_AlwaysAutoResize))
         return;
@@ -548,6 +648,9 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR cmdLine, int) {
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
 
+        ImGui::GetCurrentContext()->DimBgRatio =
+            ImGui::GetTopMostPopupModal() != nullptr ? 1.0f : 0.0f;
+
         drawStatusBar(ed);
         drawNotes(ed);
 
@@ -609,6 +712,7 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR cmdLine, int) {
 
         drawMenuBar(ed, running, panels);
         drawSettings(ed);
+        drawNewProject(ed);
         drawLoading(ed);
         if (!g_pendingRecent.empty()) {
             ed.queueOpenProject(g_pendingRecent);

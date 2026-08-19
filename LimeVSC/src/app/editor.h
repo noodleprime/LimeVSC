@@ -260,6 +260,9 @@ public:
                         bool fromSet);
     void     endCoalescing();
 
+    bool showNewProject = false;
+    bool createProjectAt(const std::string& dest, ProjectMode mode);
+
     bool     undoLast();
     bool     redoLast();
 

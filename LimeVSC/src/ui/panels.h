@@ -31,6 +31,8 @@ void drawStatusBar(EditorContext& ed);
 void drawNotes(EditorContext& ed);
 void statusSetArea(const char* area);
 void statusSetItemHover();
+
+std::string pickFolder(const char* title, const std::string& startAt = {});
 void statusInitLogo(void* d3d11Device);
 void* createLogoTexture(void* d3d11Device);
 void setGraphDockId(unsigned int dockId);

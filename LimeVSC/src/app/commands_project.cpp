@@ -33,7 +33,9 @@ int CALLBACK browseInit(HWND hwnd, UINT msg, LPARAM, LPARAM data) {
     return 0;
 }
 
-std::string pickFolder(const char* title, const std::string& startAt = {}) {
+}
+
+std::string pickFolder(const char* title, const std::string& startAt) {
     BROWSEINFOA bi{};
     bi.lpszTitle = title;
     bi.ulFlags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE;
@@ -48,6 +50,8 @@ std::string pickFolder(const char* title, const std::string& startAt = {}) {
     CoTaskMemFree(id);
     return ok ? std::string(buf) : std::string{};
 }
+
+namespace {
 
 std::string saveFileDialog(const char* title, const std::string& startDir,
                            const char* defaultName, bool sceneFilter = false,
@@ -143,59 +147,57 @@ void collectRuntimeErrors(EditorContext& ed) {
 
 }
 
+bool EditorContext::createProjectAt(const std::string& dest, ProjectMode mode) {
+    const bool engine = mode == ProjectMode::Engine;
+
+    Diagnostics d;
+    std::error_code ec;
+    fs::create_directories(dest, ec);
+    if (ec) {
+        note(NoteKind::Error, "cannot create " + dest);
+        return false;
+    }
+
+    const std::string tpl = ProjectContext::findTemplate(dest);
+    if (!createProject(tpl, dest, d)) {
+        report(d);
+        return false;
+    }
+
+    fs::remove(fs::path(dest) / "content" / "main.lua", ec);
+
+    project.root = dest;
+    project.limeBuilder = ProjectContext::findLimeBuilder(dest);
+    project.mode = mode;
+
+    if (engine) {
+        project.startScene = "content/main.limescene";
+        project.saveSettings(d);
+        std::error_code sec;
+        fs::create_directories(fs::path(dest) / "content", sec);
+        newScene((fs::path(dest) / "content" / "main.limescene").string(),
+                 "Main");
+    }
+
+    newGraph((fs::path(dest) / "content" / "main.lime").string(), true);
+    if (engine) seedStartScene();
+    saveAndCompile();
+    project.scan();
+    rebuildGraphFunctions();
+    report(d);
+    settings.noteProject(dest);
+    Diagnostics sd;
+    settings.save(sd);
+    log(std::string("created ") + projectModeName(project.mode) + " project at "
+        + dest);
+    note(NoteKind::Action, "Created " + std::string(projectModeName(project.mode))
+                               + " project");
+    return true;
+}
+
 void registerProjectCommands(CommandRegistry& reg) {
     reg.add({"project.new", "New Project...", "Project", "",
-             [](EditorContext& ed) {
-                 const std::string dest =
-                     pickFolder("Choose a folder for the new project",
-                                ed.settings.projectsDir);
-                 if (dest.empty()) return;
-
-                 const int choice = MessageBoxA(
-                     nullptr,
-                     "Create an ENGINE project?\n\n"
-                     "Engine - scenes, entities, components and assets: an "
-                     "editable world you place things in.\n\n"
-                     "Framework - the classic LimeX flow, where the world is "
-                     "built in code by lifecycle graphs. Nothing is lost by "
-                     "starting here; you can convert later.",
-                     "New LimeVSC project", MB_YESNOCANCEL | MB_ICONQUESTION);
-                 if (choice == IDCANCEL) return;
-                 const bool engine = (choice == IDYES);
-
-                 Diagnostics d;
-                 const std::string tpl = ProjectContext::findTemplate(dest);
-                 if (!createProject(tpl, dest, d)) { report(ed, d); return; }
-
-                 std::error_code ec;
-                 fs::remove(fs::path(dest) / "content" / "main.lua", ec);
-
-                 ed.project.root = dest;
-                 ed.project.limeBuilder = ProjectContext::findLimeBuilder(dest);
-                 ed.project.mode =
-                     engine ? ProjectMode::Engine : ProjectMode::Framework;
-
-                 if (engine) {
-                     ed.project.startScene = "content/main.limescene";
-                     ed.project.saveSettings(d);
-                     std::error_code sec;
-                     fs::create_directories(fs::path(dest) / "content", sec);
-                     ed.newScene(
-                         (fs::path(dest) / "content" / "main.limescene").string(),
-                         "Main");
-                 }
-
-                 ed.newGraph((fs::path(dest) / "content" / "main.lime").string(),
-                              true);
-                 if (engine) ed.seedStartScene();
-                 ed.saveAndCompile();
-                 ed.project.scan();
-                 ed.rebuildGraphFunctions();
-                 report(ed, d);
-                 ed.log(std::string("created ") + projectModeName(ed.project.mode)
-                        + " project at " + dest);
-             },
-             nullptr});
+             [](EditorContext& ed) { ed.showNewProject = true; }, nullptr});
 
     reg.add({"project.convert", "Convert to Engine...", "Project", "",
              [](EditorContext& ed) {
