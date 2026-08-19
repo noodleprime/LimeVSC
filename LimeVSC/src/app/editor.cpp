@@ -808,6 +808,7 @@ void EditorContext::queueOpenProject(const std::string& root) {
 
     loading.clear();
     loading.push("Scanning project", [this, root](std::string& detail) {
+        closeProject();
         project.root = root;
         project.limeBuilder = ProjectContext::findLimeBuilder(root);
         project.scan();
@@ -842,6 +843,30 @@ void EditorContext::queueOpenProject(const std::string& root) {
         log(std::string("mode: ") + projectModeName(project.mode));
         return 1.0f;
     });
+}
+
+void EditorContext::closeProject() {
+    docs.clear();
+    activeDoc = 0;
+    addDoc();
+
+    history.clear();
+    historyCursor = 0;
+    lastEdit = LastEdit::Graph;
+
+    scene.clear();
+    sceneUndo.clear();
+    scenePath.clear();
+    sceneDirty = false;
+    selectedEntity = {};
+    inspecting = Inspecting::Node;
+
+    clipNodes.clear();
+    clipLinks.clear();
+    clipEntities.clear();
+    hasClipComponent = false;
+
+    project = ProjectContext{};
 }
 
 void EditorContext::openStartScene() {

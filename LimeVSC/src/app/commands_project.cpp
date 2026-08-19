@@ -150,6 +150,7 @@ void collectRuntimeErrors(EditorContext& ed) {
 bool EditorContext::createProjectAt(const std::string& dest, ProjectMode mode,
                                     bool mainIsScript) {
     const bool engine = mode == ProjectMode::Engine;
+    closeProject();
 
     Diagnostics d;
     std::error_code ec;

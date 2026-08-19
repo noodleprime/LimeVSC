@@ -1248,3 +1248,34 @@ TEST_CASE("pasting keeps the clipboard for another paste") {
     ed.pasteClipboard();
     CHECK(ed.graph().nodes().size() == 3);
 }
+
+TEST_CASE("closing a project leaves nothing of it behind") {
+    EditorContext ed;
+    ed.project.root = "C:/game";
+    ed.project.mode = ProjectMode::Engine;
+    ed.scenePath = "C:/game/content/Scenes/main.limescene";
+    ed.addEntity("Thing", {});
+    ed.sceneDirty = true;
+
+    ed.docs[0]->filePath = "C:/game/content/Graphs/main.lime";
+    ed.addDoc();
+    ed.docs[1]->filePath = "C:/game/content/Graphs/other.lime";
+    ed.selection() = {ed.graph().addNode("core.raw", 0, 0)};
+    ed.copySelection();
+
+    ed.closeProject();
+
+    CHECK(ed.docs.size() == 1);
+    CHECK(ed.docs[0]->filePath.empty());
+    CHECK(ed.graph().nodes().empty());
+    CHECK(ed.activeDoc == 0);
+    CHECK(ed.history.empty());
+    CHECK(ed.historyCursor == 0);
+    CHECK(ed.scenePath.empty());
+    CHECK(ed.scene.size() == 0);
+    CHECK_FALSE(ed.sceneDirty);
+    CHECK(ed.project.root.empty());
+    CHECK(ed.project.mode == ProjectMode::Framework);
+    CHECK(ed.clipNodes.empty());
+    CHECK_FALSE(ed.canUndoAny());
+}
