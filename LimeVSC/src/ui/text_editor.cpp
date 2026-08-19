@@ -406,9 +406,10 @@ ImGuiWindow* inputChild(const char* label) {
     ImGuiContext& g = *ImGui::GetCurrentContext();
     ImGuiWindow* parent = ImGui::GetCurrentWindow();
     if (!parent) return nullptr;
-    const std::string want = std::string(parent->Name) + "/" + label;
+    const std::string tail = std::string("/") + label;
     for (ImGuiWindow* w : g.Windows)
-        if (std::strncmp(w->Name, want.c_str(), want.size()) == 0) return w;
+        if (w->ParentWindow == parent && std::strstr(w->Name, tail.c_str()))
+            return w;
     return nullptr;
 }
 
