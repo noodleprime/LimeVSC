@@ -287,6 +287,8 @@ public:
     bool   editingPrefab() const;
     void   forgetDeleted(const std::string& path);
     void   openStartScene();
+    static bool isLuaPath(const std::string& path);
+    static bool isTextPath(const std::string& path);
     void   closeProject();
     bool   instantiatePrefab(const std::string& path, EntityId parent);
     void   rescanAssets();

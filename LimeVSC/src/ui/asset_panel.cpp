@@ -370,7 +370,7 @@ private:
         }
 
         if (ImGui::BeginPopupContextItem("fctx")) {
-            if (isScene || isGraph || isLua)
+            if (isScene || isGraph || EditorContext::isTextPath(path))
                 if (ImGui::MenuItem("Open")) openFile(e, path);
             if (isPrefabFile)
                 if (ImGui::MenuItem("Add to Scene", nullptr, false,
@@ -420,7 +420,7 @@ private:
             e.openScene(path);
             return;
         }
-        if (ext == ".lime" || ext == ".lua") e.openDoc(path);
+        if (ext == ".lime" || EditorContext::isTextPath(path)) e.openDoc(path);
     }
 
     static void importInto(EditorContext& e, const std::string& dir) {

@@ -1279,3 +1279,35 @@ TEST_CASE("closing a project leaves nothing of it behind") {
     CHECK(ed.clipNodes.empty());
     CHECK_FALSE(ed.canUndoAny());
 }
+
+TEST_CASE("the editor opens text files that are not Lua") {
+    CHECK(EditorContext::isTextPath("notes.txt"));
+    CHECK(EditorContext::isTextPath("data.json"));
+    CHECK(EditorContext::isTextPath("shader.hlsl"));
+    CHECK(EditorContext::isTextPath("README"));
+    CHECK(EditorContext::isTextPath("C:/game/content/thing.md"));
+
+    CHECK_FALSE(EditorContext::isTextPath("app.exe"));
+    CHECK_FALSE(EditorContext::isTextPath("LimeEngine.dll"));
+    CHECK_FALSE(EditorContext::isTextPath("icon.ico"));
+    CHECK_FALSE(EditorContext::isTextPath("sound.WAV"));
+}
+
+TEST_CASE("only Lua files are syntax checked") {
+    CHECK(EditorContext::isLuaPath("main.lua"));
+    CHECK_FALSE(EditorContext::isLuaPath("data.json"));
+    CHECK_FALSE(EditorContext::isLuaPath("notes.txt"));
+}
+
+TEST_CASE("a non-Lua text file reports no Lua errors") {
+    EditorContext ed;
+    ed.docs[0]->kind = GraphDoc::Kind::Text;
+    ed.docs[0]->filePath = "C:/game/content/data.json";
+    ed.docs[0]->text = "{ \"this\": is not lua at all ]]";
+    ed.recheckLua();
+    CHECK(ed.luaErrors.empty());
+
+    ed.docs[0]->filePath = "C:/game/content/broken.lua";
+    ed.recheckLua();
+    CHECK_FALSE(ed.luaErrors.empty());
+}

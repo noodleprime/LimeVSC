@@ -130,6 +130,17 @@ void lexLine(std::string_view line, int& longBracket, std::vector<Span>& out) {
 
 int g_lineCount = 1;
 
+void countLines(const std::string& text) {
+    int n = 1;
+    for (char c : text)
+        if (c == '\n') ++n;
+    g_lineCount = n;
+}
+
+bool wantsLua(const EditorContext& e) {
+    return EditorContext::isLuaPath(e.doc().filePath);
+}
+
 void drawHighlight(const std::string& text, ImVec2 origin, float lineHeight,
                    float scrollY, float viewHeight) {
     ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -235,15 +246,18 @@ void drawTextDocument(EditorContext& e) {
     ImGui::PopStyleColor(2);
 
     if (edited) {
-        e.noteTextEdit( true);
+        e.noteTextEdit(true);
         e.recheckLua();
     }
     if (ImGui::IsItemDeactivatedAfterEdit()) e.endTextBurst();
 
     const ImVec2 pad = ImGui::GetStyle().FramePadding;
-    drawHighlight(d.text, ImVec2(cursorBefore.x + pad.x,
-                                 cursorBefore.y + pad.y - syncedScroll),
-                  lineHeight, syncedScroll, avail.y);
+    if (wantsLua(e))
+        drawHighlight(d.text, ImVec2(cursorBefore.x + pad.x,
+                                     cursorBefore.y + pad.y - syncedScroll),
+                      lineHeight, syncedScroll, avail.y);
+    else
+        countLines(d.text);
 
     if (ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)
         && ImGui::GetIO().KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S)) {

@@ -1,6 +1,7 @@
 #include "app/editor.h"
 
 #include <algorithm>
+#include <cctype>
 #include <filesystem>
 #include <cstring>
 #include <fstream>
@@ -140,9 +141,26 @@ void EditorContext::noteTextEdit(bool burst) {
     else       endTextBurst();
 }
 
+bool EditorContext::isLuaPath(const std::string& path) {
+    return endsWith(path, ".lua");
+}
+
+bool EditorContext::isTextPath(const std::string& path) {
+    static const char* const kBinary[] = {
+        ".exe", ".dll", ".lib", ".obj", ".pdb", ".zip", ".ico", ".png",
+        ".jpg", ".jpeg", ".bmp", ".tga", ".ttf", ".otf", ".wav", ".ogg",
+        ".mp3", ".flac", ".dds", ".vsix", ".bin", ".res"};
+    std::string ext = std::filesystem::path(path).extension().string();
+    for (char& c : ext) c = static_cast<char>(std::tolower(c));
+    for (const char* b : kBinary)
+        if (ext == b) return false;
+    return true;
+}
+
 void EditorContext::recheckLua() {
     luaErrors.clear();
-    if (doc().isText()) luaErrors = checkLua(doc().text);
+    if (doc().isText() && isLuaPath(doc().filePath))
+        luaErrors = checkLua(doc().text);
 }
 
 void EditorContext::endTextBurst() {
@@ -173,14 +191,16 @@ std::size_t EditorContext::openDoc(const std::string& path) {
     } else {
         addDoc();
     }
-    if (endsWith(path, ".lua")) {
-        if (settings.openExternally(path)) {
+    if (endsWith(path, ".lime")) {
+        openFile(path);
+    } else if (isTextPath(path)) {
+        if (isLuaPath(path) && settings.openExternally(path)) {
             log("opened " + path + " externally");
             return activeDoc;
         }
         openText(path);
     } else {
-        openFile(path);
+        log("not a text file: " + path);
     }
     return activeDoc;
 }
