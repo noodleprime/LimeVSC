@@ -368,6 +368,7 @@ public:
         drawNodes(e);
         drawLinks(e);
         drawCarriedWire();
+        drawPendingWire();
         handleCreate(e);
         handleDelete(e);
         syncSelection(e);
@@ -781,6 +782,28 @@ private:
             g_carry = {true, sinks.front(),  false, pd->kind};
     }
 
+    static void drawPendingWire() {
+        if (!g_pending.active) return;
+        const PinRect* from = nullptr;
+        for (const PinRect& r : g_pinRects)
+            if (r.pin == g_pending.from) { from = &r; break; }
+        if (!from) return;
+
+        const ImVec2 a = wireAnchor(*from);
+        const ImVec2 b = ed::CanvasToScreen(g_pending.canvasPos);
+        const float span = std::max(40.0f, std::abs(b.x - a.x) * 0.5f);
+        const float dir = g_pending.fromDir == PinDir::Out ? 1.0f : -1.0f;
+
+        ImDrawList* dl = ed::GetNodeBackgroundDrawList(
+            ed::NodeId(encNodeId(g_pending.from.node.v)));
+        if (!dl) dl = ImGui::GetWindowDrawList();
+        buildPixelWire(a, ImVec2(a.x + span * dir, a.y),
+                       ImVec2(b.x - span * dir, b.y), b, 1.0f, 1.0f,
+                       [dl](ImVec2 lo, ImVec2 hi) {
+                           dl->AddRectFilled(lo, hi, IM_COL32(150, 210, 255, 220));
+                       });
+    }
+
     static void drawCarriedWire() {
         if (!g_carry.active) return;
 
@@ -957,6 +980,11 @@ private:
     }
 
     static void drawContextMenus(EditorContext& e) {
+        static bool addWasOpen = false;
+        const bool addIsOpen = ImGui::IsPopupOpen("canvas.add");
+        if (addWasOpen && !addIsOpen) g_pending = {};
+        addWasOpen = addIsOpen;
+
         if (ed::ShowBackgroundContextMenu()) {
             g_pending = {};
             g_lastCanvasMouse = ed::ScreenToCanvas(ImGui::GetMousePos());
