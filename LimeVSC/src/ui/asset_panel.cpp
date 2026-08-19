@@ -101,13 +101,79 @@ private:
         if (!pick.empty()) e.queueOpenProject(pick);
     }
 
+    static std::string shownRoot(const std::string& root) {
+        namespace fs = std::filesystem;
+        if (root.empty()) return root;
+
+        const fs::path def(AppSettings::defaultProjectsDir());
+        if (def.empty()) return root;
+
+        const fs::path under = fs::path(root).lexically_relative(def);
+        if (under.empty() || under.native().rfind(L"..", 0) == 0) return root;
+
+        const fs::path base = def.parent_path().parent_path();
+        if (base.empty()) return root;
+        const fs::path shown = fs::path(root).lexically_relative(base);
+        if (shown.empty() || shown.native().rfind(L"..", 0) == 0) return root;
+        return shown.string();
+    }
+
     void drawToolbar(EditorContext& e) {
-        ImGui::TextDisabled("%s", e.project.root.c_str());
-        if (ImGui::Button("Build"))     e.commands.invoke("project.build", e);
+        struct BuildAction {
+            const char* label;
+            const char* command;
+            const char* shortcut;
+        };
+        static const BuildAction kActions[] = {
+            {"Build+Run", "project.buildRun", "Ctrl+F5"},
+            {"Build", "project.build", "F7"},
+            {"Run", "project.run", "F5"},
+        };
+        static int chosen = 0;
+
+        const ImGuiStyle& st = ImGui::GetStyle();
+        const char*  label = kActions[chosen].label;
+        const float  arrowW = ImGui::GetFrameHeight();
+        const ImVec2 ts = ImGui::CalcTextSize(label);
+        const float  w = ts.x + st.FramePadding.x * 2.0f + arrowW;
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+
+        const bool pressed = ImGui::Button("##buildsplit", ImVec2(w, 0));
+        const float h = ImGui::GetItemRectSize().y;
+        const float sepX = at.x + w - arrowW;
+
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        const ImU32 fg = ImGui::GetColorU32(ImGuiCol_Text);
+        dl->AddText(ImVec2(at.x + st.FramePadding.x, at.y + st.FramePadding.y),
+                    fg, label);
+        dl->AddLine(ImVec2(sepX, at.y + 3.0f), ImVec2(sepX, at.y + h - 3.0f),
+                    ImGui::GetColorU32(ImGuiCol_Separator));
+        const float cx = sepX + arrowW * 0.5f;
+        const float cy = at.y + h * 0.5f;
+        dl->AddTriangleFilled(ImVec2(cx - 3.5f, cy - 1.5f),
+                              ImVec2(cx + 3.5f, cy - 1.5f),
+                              ImVec2(cx, cy + 2.5f), fg);
+
+        if (pressed) {
+            if (ImGui::GetIO().MouseClickedPos[0].x >= sepX)
+                ImGui::OpenPopup("buildmore");
+            else
+                e.commands.invoke(kActions[chosen].command, e);
+        }
+
         ImGui::SameLine();
-        if (ImGui::Button("Run"))       e.commands.invoke("project.run", e);
-        ImGui::SameLine();
-        if (ImGui::Button("Build+Run")) e.commands.invoke("project.buildRun", e);
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextDisabled("%s", shownRoot(e.project.root).c_str());
+
+        if (ImGui::BeginPopup("buildmore")) {
+            for (int i = 0; i < IM_ARRAYSIZE(kActions); ++i)
+                if (ImGui::MenuItem(kActions[i].label, kActions[i].shortcut,
+                                    i == chosen)) {
+                    chosen = i;
+                    e.commands.invoke(kActions[i].command, e);
+                }
+            ImGui::EndPopup();
+        }
         ImGui::Separator();
     }
 
