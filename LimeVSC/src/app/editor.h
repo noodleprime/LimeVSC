@@ -286,6 +286,7 @@ public:
     void   newPrefab(const std::string& path, const std::string& name);
     bool   editingPrefab() const;
     void   forgetDeleted(const std::string& path);
+    static std::string mainFileOf(const ProjectContext& p);
     void   openStartScene();
     static bool isLuaPath(const std::string& path);
     static bool isTextPath(const std::string& path);

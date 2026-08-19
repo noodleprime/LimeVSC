@@ -1,6 +1,7 @@
 #include "api/data_provider.h"
 #include "api/luals_provider.h"
 #include "limecore.h"
+#include "app/editor.h"
 #include "project/project.h"
 
 #include <ostream>
@@ -155,4 +156,40 @@ TEST_CASE("full project workflow" * doctest::skip(false)) {
     }
 
     fs::remove_all(tmp, ec);
+}
+
+TEST_CASE("the main file is found whether it is a graph or a script") {
+    ProjectContext p;
+    p.root = "C:/game";
+
+    SUBCASE("a graph project picks main.lime") {
+        p.limeFiles = {"C:/game/content/Graphs/other.lime",
+                       "C:/game/content/Graphs/main.lime"};
+        p.luaFiles = {"C:/game/content/Scripts/Generated/main.lua"};
+        CHECK(EditorContext::mainFileOf(p) == "C:/game/content/Graphs/main.lime");
+    }
+
+    SUBCASE("a script project picks main.lua") {
+        p.luaFiles = {"C:/game/content/Scripts/helper.lua",
+                      "C:/game/content/Scripts/main.lua"};
+        CHECK(EditorContext::mainFileOf(p) == "C:/game/content/Scripts/main.lua");
+    }
+
+    SUBCASE("generated lua is never the main file") {
+        p.luaFiles = {"C:/game/content/Scripts/Generated/main.lua"};
+        CHECK(EditorContext::mainFileOf(p).empty());
+    }
+
+    SUBCASE("it falls back to any graph, then any hand written script") {
+        p.limeFiles = {"C:/game/content/Graphs/only.lime"};
+        CHECK(EditorContext::mainFileOf(p) == "C:/game/content/Graphs/only.lime");
+        p.limeFiles.clear();
+        p.luaFiles = {"C:/game/content/Scripts/Generated/a.lua",
+                      "C:/game/content/Scripts/b.lua"};
+        CHECK(EditorContext::mainFileOf(p) == "C:/game/content/Scripts/b.lua");
+    }
+
+    SUBCASE("an empty project has no main file") {
+        CHECK(EditorContext::mainFileOf(p).empty());
+    }
 }

@@ -842,19 +842,14 @@ void EditorContext::queueOpenProject(const std::string& root) {
         return 1.0f;
     });
     queueAssetScan();
-    loading.push("Opening graph", [this, root](std::string& detail) {
+    loading.push("Opening main file", [this, root](std::string& detail) {
         settings.noteProject(root);
         Diagnostics sd;
         settings.save(sd);
 
-        std::string pick;
-        for (const std::string& f : project.limeFiles)
-            if (std::filesystem::path(f).filename() == "main.lime") pick = f;
-        if (pick.empty() && !project.limeFiles.empty())
-            pick = project.limeFiles.front();
-
+        const std::string pick = mainFileOf(project);
         if (pick.empty()) {
-            log("opened project " + root + " (no graphs yet)");
+            log("opened project " + root + " (nothing to open yet)");
         } else {
             openDoc(pick);
             detail = std::filesystem::path(pick).filename().string();
@@ -887,6 +882,19 @@ void EditorContext::closeProject() {
     hasClipComponent = false;
 
     project = ProjectContext{};
+}
+
+std::string EditorContext::mainFileOf(const ProjectContext& p) {
+    namespace fs = std::filesystem;
+    for (const std::string& f : p.limeFiles)
+        if (fs::path(f).filename() == "main.lime") return f;
+    for (const std::string& f : p.luaFiles)
+        if (fs::path(f).filename() == "main.lua" && !isGeneratedLuaPath(f))
+            return f;
+    if (!p.limeFiles.empty()) return p.limeFiles.front();
+    for (const std::string& f : p.luaFiles)
+        if (!isGeneratedLuaPath(f)) return f;
+    return {};
 }
 
 void EditorContext::openStartScene() {
