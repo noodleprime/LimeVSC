@@ -60,7 +60,11 @@ private:
     std::string deleteTarget;
     std::vector<std::string> selected;
     std::vector<std::string> rowOrder;
+    std::vector<ImVec2>      rowMin, rowMax;
     std::string anchorRow;
+    std::vector<std::string> bandBase;
+    ImVec2 bandStart{};
+    bool   banding = false;
     std::string createDir;
     int         createKind = 0;
     char        createBuf[128] = "";
@@ -227,6 +231,42 @@ private:
         anchorRow = path;
     }
 
+    void dragSelect() {
+        const ImGuiIO& io = ImGui::GetIO();
+        const bool inside = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows);
+
+        if (!banding && inside && ImGui::IsMouseClicked(ImGuiMouseButton_Left)
+            && !ImGui::IsAnyItemHovered()) {
+            banding = true;
+            bandStart = ImGui::GetMousePos();
+            bandBase = io.KeyCtrl ? selected : std::vector<std::string>{};
+            selected = bandBase;
+            anchorRow.clear();
+        }
+        if (!banding) return;
+        if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+            banding = false;
+            return;
+        }
+
+        const ImVec2 now = ImGui::GetMousePos();
+        const ImVec2 lo((std::min)(bandStart.x, now.x),
+                        (std::min)(bandStart.y, now.y));
+        const ImVec2 hi((std::max)(bandStart.x, now.x),
+                        (std::max)(bandStart.y, now.y));
+
+        selected = bandBase;
+        for (std::size_t i = 0; i < rowOrder.size(); ++i) {
+            if (rowMax[i].y < lo.y || rowMin[i].y > hi.y) continue;
+            if (rowMax[i].x < lo.x || rowMin[i].x > hi.x) continue;
+            if (!isSelected(rowOrder[i])) selected.push_back(rowOrder[i]);
+        }
+
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        dl->AddRectFilled(lo, hi, IM_COL32(140, 209, 115, 40));
+        dl->AddRect(lo, hi, IM_COL32(140, 209, 115, 160));
+    }
+
     void drawTree(EditorContext& e) {
         namespace fs = std::filesystem;
         const std::string root = e.project.contentDir();
@@ -238,11 +278,10 @@ private:
 
         ImGui::BeginChild("tree", ImVec2(0, 0), ImGuiChildFlags_None);
         rowOrder.clear();
+        rowMin.clear();
+        rowMax.clear();
         drawDir(e, root);
-        if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows)
-            && ImGui::IsMouseClicked(ImGuiMouseButton_Left)
-            && !ImGui::IsAnyItemHovered())
-            selected.clear();
+        dragSelect();
         if (ImGui::BeginPopupContextWindow("rootctx",
                                            ImGuiPopupFlags_MouseButtonRight
                                                | ImGuiPopupFlags_NoOpenOverItems)) {
@@ -305,6 +344,7 @@ private:
                                              ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
         rowOrder.push_back(path);
         const bool picked = isSelected(path);
+        const ImVec2 rowTop = ImGui::GetCursorScreenPos();
         if (ImGui::Selectable(fileName(path).c_str(), active || picked,
                               ImGuiSelectableFlags_AllowDoubleClick)) {
             clickRow(path);
@@ -312,6 +352,8 @@ private:
             if (!io.KeyCtrl && !io.KeyShift) openFile(e, path);
         }
         if (generated) ImGui::PopStyleColor();
+        rowMin.push_back(rowTop);
+        rowMax.push_back(ImGui::GetItemRectMax());
 
         if (isPrefabFile
             && ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoHoldToOpenOthers)) {
