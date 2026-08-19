@@ -58,6 +58,9 @@ private:
     bool        openRename = false;
     char        filter[64] = {};
     std::string deleteTarget;
+    std::vector<std::string> selected;
+    std::vector<std::string> rowOrder;
+    std::string anchorRow;
     std::string createDir;
     int         createKind = 0;
     char        createBuf[128] = "";
@@ -195,6 +198,35 @@ private:
         ImGui::Separator();
     }
 
+    bool isSelected(const std::string& p) const {
+        return std::find(selected.begin(), selected.end(), p) != selected.end();
+    }
+
+    void clickRow(const std::string& path) {
+        const ImGuiIO& io = ImGui::GetIO();
+        if (io.KeyShift && !anchorRow.empty()) {
+            const auto a = std::find(rowOrder.begin(), rowOrder.end(), anchorRow);
+            const auto b = std::find(rowOrder.begin(), rowOrder.end(), path);
+            if (a != rowOrder.end() && b != rowOrder.end()) {
+                auto lo = a, hi = b;
+                if (lo > hi) std::swap(lo, hi);
+                if (!io.KeyCtrl) selected.clear();
+                for (auto it = lo; it <= hi; ++it)
+                    if (!isSelected(*it)) selected.push_back(*it);
+                return;
+            }
+        }
+        if (io.KeyCtrl) {
+            const auto at = std::find(selected.begin(), selected.end(), path);
+            if (at != selected.end()) selected.erase(at);
+            else selected.push_back(path);
+            anchorRow = path;
+            return;
+        }
+        selected.assign(1, path);
+        anchorRow = path;
+    }
+
     void drawTree(EditorContext& e) {
         namespace fs = std::filesystem;
         const std::string root = e.project.contentDir();
@@ -205,7 +237,12 @@ private:
         }
 
         ImGui::BeginChild("tree", ImVec2(0, 0), ImGuiChildFlags_None);
+        rowOrder.clear();
         drawDir(e, root);
+        if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows)
+            && ImGui::IsMouseClicked(ImGuiMouseButton_Left)
+            && !ImGui::IsAnyItemHovered())
+            selected.clear();
         if (ImGui::BeginPopupContextWindow("rootctx",
                                            ImGuiPopupFlags_MouseButtonRight
                                                | ImGuiPopupFlags_NoOpenOverItems)) {
@@ -266,7 +303,14 @@ private:
         ImGui::PushID(path.c_str());
         if (generated) ImGui::PushStyleColor(ImGuiCol_Text,
                                              ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
-        if (ImGui::Selectable(fileName(path).c_str(), active)) openFile(e, path);
+        rowOrder.push_back(path);
+        const bool picked = isSelected(path);
+        if (ImGui::Selectable(fileName(path).c_str(), active || picked,
+                              ImGuiSelectableFlags_AllowDoubleClick)) {
+            clickRow(path);
+            const ImGuiIO& io = ImGui::GetIO();
+            if (!io.KeyCtrl && !io.KeyShift) openFile(e, path);
+        }
         if (generated) ImGui::PopStyleColor();
 
         if (isPrefabFile
@@ -299,8 +343,14 @@ private:
             }
             ImGui::Separator();
             const bool locked = needed(e, path);
-            if (ImGui::MenuItem("Delete", nullptr, false, !generated && !locked))
+            const int many = picked ? static_cast<int>(selected.size()) : 1;
+            char label[48];
+            if (many > 1) std::snprintf(label, sizeof(label), "Delete %d items", many);
+            else std::snprintf(label, sizeof(label), "Delete");
+            if (ImGui::MenuItem(label, nullptr, false, !generated && !locked)) {
+                if (!picked) selected.assign(1, path);
                 deleteTarget = path;
+            }
             if ((generated || locked)
                 && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
                 ImGui::SetTooltip(
@@ -419,6 +469,14 @@ private:
         return false;
     }
 
+    std::vector<std::string> targets() const {
+        if (selected.size() > 1
+            && std::find(selected.begin(), selected.end(), deleteTarget)
+                   != selected.end())
+            return selected;
+        return {deleteTarget};
+    }
+
     void drawDeleteModal(EditorContext& e) {
         namespace fs = std::filesystem;
         if (!deleteTarget.empty() && !ImGui::IsPopupOpen("Delete"))
@@ -431,8 +489,15 @@ private:
 
         std::error_code ec;
         const bool isDir = fs::is_directory(deleteTarget, ec);
-        ImGui::TextWrapped("Delete %s?", fileName(deleteTarget).c_str());
-        ImGui::TextDisabled("%s", deleteTarget.c_str());
+        const std::vector<std::string> batch = targets();
+        if (batch.size() > 1) {
+            ImGui::TextWrapped("Delete these %zu items?", batch.size());
+            for (const std::string& t : batch)
+                ImGui::TextDisabled("%s", fileName(t).c_str());
+        } else {
+            ImGui::TextWrapped("Delete %s?", fileName(deleteTarget).c_str());
+            ImGui::TextDisabled("%s", deleteTarget.c_str());
+        }
 
         if (isDir) {
             int files = 0, dirs = 0;
@@ -472,27 +537,35 @@ private:
 
         ImGui::Separator();
         if (ImGui::Button("Delete", ImVec2(120, 0))) {
-            std::error_code dec;
-            if (isDir) fs::remove_all(deleteTarget, dec);
-            else {
-                fs::remove(deleteTarget, dec);
-                if (endsWithLime(deleteTarget)) {
-                    std::error_code gec;
-                    const std::string gen = generatedLuaPath(deleteTarget);
-                    fs::remove(gen, gec);
-                    fs::remove(gen + ".map", gec);
+            std::vector<std::string> batch = targets();
+            int done = 0;
+            for (const std::string& t : batch) {
+                std::error_code dec;
+                if (fs::is_directory(t, dec)) fs::remove_all(t, dec);
+                else {
+                    fs::remove(t, dec);
+                    if (endsWithLime(t)) {
+                        std::error_code gec;
+                        const std::string gen = generatedLuaPath(t);
+                        fs::remove(gen, gec);
+                        fs::remove(gen + ".map", gec);
+                    }
+                }
+                if (dec)
+                    e.note(EditorContext::NoteKind::Error,
+                           "could not delete " + fileName(t));
+                else {
+                    e.forgetDeleted(t);
+                    ++done;
                 }
             }
-            if (dec) {
-                e.note(EditorContext::NoteKind::Error,
-                       "could not delete " + fileName(deleteTarget));
-            } else {
-                e.forgetDeleted(deleteTarget);
+            if (done > 0)
                 e.note(EditorContext::NoteKind::Action,
-                       "Deleted " + fileName(deleteTarget));
-            }
+                       done == 1 ? "Deleted " + fileName(batch.front())
+                                 : "Deleted " + std::to_string(done) + " items");
             e.project.scan();
             e.rescanAssets();
+            selected.clear();
             deleteTarget.clear();
             ImGui::CloseCurrentPopup();
         }
