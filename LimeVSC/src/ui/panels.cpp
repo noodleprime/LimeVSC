@@ -1500,6 +1500,25 @@ void drawVariables(EditorContext& e) {
         VarDecl& v = g.variables[i];
         ImGui::PushID(static_cast<int>(i));
 
+        const bool open = ImGui::TreeNodeEx(
+            "##row", ImGuiTreeNodeFlags_SpanAvailWidth
+                         | ImGuiTreeNodeFlags_AllowOverlap,
+            "%s", v.name.c_str());
+        ImGui::SameLine();
+        ImGui::TextDisabled("%s", v.type.c_str());
+
+        const float xw = ImGui::GetFrameHeight();
+        ImGui::SameLine(ImGui::GetContentRegionMax().x - xw);
+        if (ImGui::SmallButton("x")) removeAt = static_cast<int>(i);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Remove. Any Get or Set node still using it "
+                              "will report an error until you delete it.");
+
+        if (!open) {
+            ImGui::PopID();
+            continue;
+        }
+
         char name[96];
         std::snprintf(name, sizeof(name), "%s", v.name.c_str());
         ImGui::SetNextItemWidth(-1);
@@ -1524,17 +1543,12 @@ void drawVariables(EditorContext& e) {
         ImGui::SameLine();
         char def[128];
         std::snprintf(def, sizeof(def), "%s", v.defaultValue.c_str());
-        ImGui::SetNextItemWidth(-24);
+        ImGui::SetNextItemWidth(-1);
         if (ImGui::InputTextWithHint("##d", "default", def, sizeof(def)))
             v.defaultValue = def;
         if (ImGui::IsItemDeactivatedAfterEdit()) commit(e);
 
-        ImGui::SameLine();
-        if (ImGui::SmallButton("x")) removeAt = static_cast<int>(i);
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Remove. Any Get or Set node still using it "
-                              "will report an error until you delete it.");
-        ImGui::Separator();
+        ImGui::TreePop();
         ImGui::PopID();
     }
 
