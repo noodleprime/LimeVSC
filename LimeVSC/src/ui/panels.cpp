@@ -795,7 +795,7 @@ private:
         if (!from) return;
 
         const ImVec2 a = wireAnchor(*from);
-        const ImVec2 b = ed::CanvasToScreen(g_pending.canvasPos);
+        const ImVec2 b = g_pending.canvasPos;
         const float span = std::max(40.0f, std::abs(b.x - a.x) * 0.5f);
         const float dir = g_pending.fromDir == PinDir::Out ? 1.0f : -1.0f;
 
