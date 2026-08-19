@@ -1202,3 +1202,49 @@ TEST_CASE("undoing a gizmo drag restores an unset property to unset") {
     CHECK(ed.scene.entity(ent)->component("Transform")->value("scale")
           == nullptr);
 }
+
+TEST_CASE("copying nodes brings the links between them") {
+    EditorContext ed;
+    const NodeId a = ed.graph().addNode("Lime.onStart", 0, 0);
+    const NodeId b = ed.graph().addNode("core.raw", 200, 0);
+    ed.graph().connect(PinId::make(a, "out"), PinId::make(b, "in"),
+                       PinKind::Exec);
+
+    ed.selection() = {a, b};
+    ed.copySelection();
+    CHECK(ed.clipNodes.size() == 2);
+    CHECK(ed.clipLinks.size() == 1);
+
+    const std::size_t before = ed.graph().nodes().size();
+    ed.pasteClipboard();
+    CHECK(ed.graph().nodes().size() == before + 2);
+    CHECK(ed.selection().size() == 2);
+
+    const NodeId na = ed.selection()[0];
+    const NodeId nb = ed.selection()[1];
+    CHECK(na != a);
+    CHECK(!ed.graph().execSourcesOf(PinId::make(nb, "in")).empty());
+}
+
+TEST_CASE("a link with only one end copied is not carried over") {
+    EditorContext ed;
+    const NodeId a = ed.graph().addNode("Lime.onStart", 0, 0);
+    const NodeId b = ed.graph().addNode("core.raw", 200, 0);
+    ed.graph().connect(PinId::make(a, "out"), PinId::make(b, "in"),
+                       PinKind::Exec);
+
+    ed.selection() = {b};
+    ed.copySelection();
+    CHECK(ed.clipNodes.size() == 1);
+    CHECK(ed.clipLinks.empty());
+}
+
+TEST_CASE("pasting keeps the clipboard for another paste") {
+    EditorContext ed;
+    ed.selection() = {ed.graph().addNode("core.raw", 0, 0)};
+    ed.copySelection();
+
+    ed.pasteClipboard();
+    ed.pasteClipboard();
+    CHECK(ed.graph().nodes().size() == 3);
+}

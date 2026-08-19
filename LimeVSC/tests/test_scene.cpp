@@ -1,5 +1,7 @@
 #include <doctest/doctest.h>
 
+#include "app/editor.h"
+
 #include "scene/component_provider.h"
 #include "scene/scene.h"
 
@@ -241,4 +243,118 @@ TEST_CASE("higher priority wins a component id collision") {
 
     REQUIRE(reg.all().size() == 1);
     CHECK(reg.find("Health")->doc == "high");
+}
+
+TEST_CASE("copying an entity takes its whole subtree") {
+    EditorContext ed;
+    const EntityId parent = ed.addEntity("Parent", {});
+    const EntityId child = ed.addEntity("Child", parent);
+    ed.addEntity("Grandchild", child);
+    {
+        Component t;
+        t.type = "Transform";
+        t.setValue("position", "Vec3.new(3, 0, 0)");
+        ed.scene.entity(parent)->components.push_back(std::move(t));
+    }
+
+    ed.copyEntity(parent);
+    CHECK(ed.clipEntities.size() == 3);
+
+    const std::size_t before = ed.scene.size();
+    ed.pasteEntity({});
+    CHECK(ed.scene.size() == before + 3);
+
+    const std::vector<EntityId> roots = ed.scene.childrenOf({});
+    REQUIRE(roots.size() == 2);
+    const Entity* copy = ed.scene.entity(roots.back());
+    REQUIRE(copy != nullptr);
+    CHECK(copy->name == "Parent");
+    CHECK(copy->component("Transform") != nullptr);
+
+    const std::vector<EntityId> kids = ed.scene.childrenOf(copy->id);
+    REQUIRE(kids.size() == 1);
+    CHECK(ed.scene.entity(kids.front())->name == "Child");
+    CHECK(ed.scene.childrenOf(kids.front()).size() == 1);
+}
+
+TEST_CASE("pasting an entity into another parents it there") {
+    EditorContext ed;
+    const EntityId a = ed.addEntity("A", {});
+    const EntityId b = ed.addEntity("B", {});
+
+    ed.copyEntity(a);
+    ed.pasteEntity(b);
+
+    const std::vector<EntityId> kids = ed.scene.childrenOf(b);
+    REQUIRE(kids.size() == 1);
+    CHECK(ed.scene.entity(kids.front())->name == "A");
+}
+
+TEST_CASE("an entity cannot be parented to its own child") {
+    EditorContext ed;
+    const EntityId parent = ed.addEntity("Parent", {});
+    const EntityId child = ed.addEntity("Child", parent);
+
+    ed.reparentEntity(parent, child);
+    CHECK(ed.scene.entity(parent)->parent == EntityId{});
+    CHECK(ed.scene.entity(child)->parent == parent);
+}
+
+TEST_CASE("a component can be copied onto another entity") {
+    EditorContext ed;
+    const EntityId a = ed.addEntity("A", {});
+    const EntityId b = ed.addEntity("B", {});
+    {
+        Component t;
+        t.type = "Transform";
+        t.setValue("position", "Vec3.new(7, 0, 0)");
+        ed.scene.entity(a)->components.push_back(std::move(t));
+    }
+
+    ed.copyComponent(a, "Transform");
+    CHECK(ed.hasClipComponent);
+    ed.pasteComponent(b);
+
+    const Component* on = ed.scene.entity(b)->component("Transform");
+    REQUIRE(on != nullptr);
+    CHECK(*on->value("position") == "Vec3.new(7, 0, 0)");
+
+    REQUIRE(ed.undoLast());
+    CHECK(ed.scene.entity(b)->component("Transform") == nullptr);
+}
+
+TEST_CASE("pasting over an existing component replaces its values") {
+    EditorContext ed;
+    const EntityId a = ed.addEntity("A", {});
+    Component t;
+    t.type = "Transform";
+    t.setValue("position", "Vec3.new(1, 1, 1)");
+    ed.scene.entity(a)->components.push_back(t);
+
+    ed.clipComponent = t;
+    ed.clipComponent.setValue("position", "Vec3.new(9, 9, 9)");
+    ed.hasClipComponent = true;
+    ed.pasteComponent(a);
+
+    CHECK(*ed.scene.entity(a)->component("Transform")->value("position")
+          == "Vec3.new(9, 9, 9)");
+    CHECK(ed.scene.entity(a)->components.size() == 1);
+
+    REQUIRE(ed.undoLast());
+    CHECK(*ed.scene.entity(a)->component("Transform")->value("position")
+          == "Vec3.new(1, 1, 1)");
+}
+
+TEST_CASE("unparenting returns an entity to the root") {
+    EditorContext ed;
+    const EntityId parent = ed.addEntity("Parent", {});
+    const EntityId child = ed.addEntity("Child", parent);
+    REQUIRE(ed.scene.entity(child)->parent == parent);
+
+    ed.reparentEntity(child, EntityId{});
+    CHECK(ed.scene.entity(child)->parent == EntityId{});
+    CHECK(ed.scene.childrenOf(parent).empty());
+
+    REQUIRE(ed.undoLast());
+    CHECK(ed.scene.entity(child)->parent == parent);
 }

@@ -83,6 +83,91 @@ void EditorContext::renameEntity(EntityId id, std::string name) {
                 }});
 }
 
+namespace {
+
+void collectSubtree(const Scene& s, EntityId id, std::vector<Entity>& out) {
+    if (const Entity* e = s.entity(id)) out.push_back(*e);
+    for (EntityId c : s.childrenOf(id)) collectSubtree(s, c, out);
+}
+
+}
+
+void EditorContext::copyEntity(EntityId id) {
+    clipEntities.clear();
+    if (!scene.entity(id)) return;
+    collectSubtree(scene, id, clipEntities);
+}
+
+void EditorContext::pasteEntity(EntityId into) {
+    if (clipEntities.empty()) return;
+
+    const EntityId rootOf = clipEntities.front().id;
+    std::vector<std::pair<std::uint32_t, EntityId>> remap;
+    const auto mapped = [&](EntityId old, EntityId& out) {
+        for (const auto& [from, to] : remap)
+            if (from == old.v) { out = to; return true; }
+        return false;
+    };
+
+    EntityId first{};
+    for (const Entity& src : clipEntities) {
+        EntityId parent = into;
+        if (src.id.v != rootOf.v) {
+            EntityId mappedParent{};
+            if (mapped(src.parent, mappedParent)) parent = mappedParent;
+        }
+        const EntityId made = addEntity(src.name, parent);
+        remap.push_back({src.id.v, made});
+        if (!first.valid()) first = made;
+        if (Entity* dst = scene.entity(made))
+            dst->components = src.components;
+    }
+    sceneDirty = true;
+    if (first.valid()) selectedEntity = first;
+}
+
+void EditorContext::copyComponent(EntityId id, const std::string& type) {
+    const Entity* e = scene.entity(id);
+    if (!e) return;
+    const Component* c = e->component(type);
+    if (!c) return;
+    clipComponent = *c;
+    hasClipComponent = true;
+}
+
+void EditorContext::pasteComponent(EntityId id) {
+    if (!hasClipComponent) return;
+    const Entity* e = scene.entity(id);
+    if (!e) return;
+
+    const Component add = clipComponent;
+    const Component* existing = e->component(add.type);
+    const bool had = existing != nullptr;
+    const Component was = had ? *existing : Component{};
+
+    applyScene({had ? "Paste Component Values" : "Paste Component",
+                [id, add](Scene& s) {
+                    Entity* t = s.entity(id);
+                    if (!t) return;
+                    if (Component* c = t->component(add.type)) *c = add;
+                    else t->components.push_back(add);
+                },
+                [id, add, had, was](Scene& s) {
+                    Entity* t = s.entity(id);
+                    if (!t) return;
+                    if (had) {
+                        if (Component* c = t->component(add.type)) *c = was;
+                        return;
+                    }
+                    for (std::size_t i = 0; i < t->components.size(); ++i)
+                        if (t->components[i].type == add.type) {
+                            t->components.erase(t->components.begin()
+                                                + static_cast<std::ptrdiff_t>(i));
+                            return;
+                        }
+                }});
+}
+
 void EditorContext::reparentEntity(EntityId child, EntityId newParent) {
     const Entity* e = scene.entity(child);
     if (!e || e->parent == newParent) return;

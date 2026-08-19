@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <cstring>
 #include <fstream>
+#include <set>
 #include <sstream>
 
 namespace lime {
@@ -615,6 +616,57 @@ void EditorContext::newGraph(const std::string& path, bool withInit) {
     log(path.empty() ? "new graph (unsaved)" : "new graph " + path);
 }
 
+void EditorContext::copySelection() {
+    clipNodes.clear();
+    clipLinks.clear();
+    std::set<std::uint32_t> picked;
+    for (NodeId id : selection())
+        if (const Node* n = graph().node(id)) {
+            clipNodes.push_back(*n);
+            picked.insert(id.v);
+        }
+    for (const Link& l : graph().links())
+        if (picked.count(l.from.node.v) && picked.count(l.to.node.v))
+            clipLinks.push_back(l);
+}
+
+void EditorContext::pasteClipboard() {
+    if (clipNodes.empty()) return;
+
+    std::vector<std::pair<std::uint32_t, NodeId>> remap;
+    std::vector<NodeId> made;
+    for (const Node& src : clipNodes) {
+        const NodeId n{graph().nextId};
+        const std::string type = src.type;
+        const float x = src.x + 32.0f;
+        const float y = src.y + 32.0f;
+        apply({"Paste",
+               [n, type, x, y](Graph& g) { g.addNodeWithId(n, type, x, y); },
+               [n](Graph& g) { g.removeNode(n); }});
+        if (Node* dst = graph().node(n)) {
+            dst->values = src.values;
+            dst->comment = src.comment;
+            dst->rawBody = src.rawBody;
+            dst->w = src.w;
+            dst->h = src.h;
+        }
+        remap.push_back({src.id.v, n});
+        made.push_back(n);
+    }
+
+    const auto mapped = [&](NodeId old, NodeId& out) {
+        for (const auto& [from, to] : remap)
+            if (from == old.v) { out = to; return true; }
+        return false;
+    };
+    for (const Link& l : clipLinks) {
+        NodeId f{}, t{};
+        if (!mapped(l.from.node, f) || !mapped(l.to.node, t)) continue;
+        connect(PinId{f, l.from.pin}, PinId{t, l.to.pin}, l.kind);
+    }
+    selection() = made;
+}
+
 void EditorContext::seedStartScene() {
     const NodeDesc* d = nodes.find("scene.start");
     if (!d) {
@@ -865,19 +917,22 @@ void registerCoreCommands(CommandRegistry& reg) {
 
     reg.add({"graph.duplicate", "Duplicate Selected", "Graph", "Ctrl+D",
              [](EditorContext& ed) {
-                 std::vector<NodeId> made;
-                 for (NodeId id : ed.selection()) {
-                     const Node* src = ed.graph().node(id);
-                     if (!src) continue;
-                     const NodeDesc* d = ed.nodes.find(src->type);
-                     if (!d) continue;
-                     const NodeId n = ed.addNode(*d, src->x + 24.0f, src->y + 24.0f);
-                     if (Node* dst = ed.graph().node(n)) dst->values = src->values;
-                     made.push_back(n);
-                 }
-                 ed.selection() = made;
+                 std::vector<Node> keepNodes = ed.clipNodes;
+                 std::vector<Link> keepLinks = ed.clipLinks;
+                 ed.copySelection();
+                 ed.pasteClipboard();
+                 ed.clipNodes = std::move(keepNodes);
+                 ed.clipLinks = std::move(keepLinks);
              },
              [](EditorContext& ed) { return !ed.selection().empty(); }});
+
+    reg.add({"graph.copy", "Copy", "Graph", "Ctrl+C",
+             [](EditorContext& ed) { ed.copySelection(); },
+             [](EditorContext& ed) { return !ed.selection().empty(); }});
+
+    reg.add({"graph.paste", "Paste", "Graph", "Ctrl+V",
+             [](EditorContext& ed) { ed.pasteClipboard(); },
+             [](EditorContext& ed) { return !ed.clipNodes.empty(); }});
 
     reg.add({"graph.comment", "Comment Selection", "Graph", "C",
              [](EditorContext& ed) {

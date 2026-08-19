@@ -150,6 +150,15 @@ public:
             ImGui::EndDragDropTarget();
         }
 
+        if (ImGui::BeginPopupContextWindow("hctx",
+                                           ImGuiPopupFlags_MouseButtonRight
+                                               | ImGuiPopupFlags_NoOpenOverItems)) {
+            if (ImGui::MenuItem("Add Entity")) e.addEntity("Entity", {});
+            if (ImGui::MenuItem("Paste", "Ctrl+V", false, !e.clipEntities.empty()))
+                e.pasteEntity(EntityId{});
+            ImGui::EndPopup();
+        }
+
         if (renameTarget.valid()) drawRenameModal(e);
     }
 
@@ -193,6 +202,19 @@ private:
             e.selectedEntity = id;
             e.inspecting = EditorContext::Inspecting::Entity;
             if (ImGui::MenuItem("Add Child")) e.addEntity("Entity", id);
+            ImGui::Separator();
+            if (ImGui::MenuItem("Unparent", nullptr, false, ent->parent.valid()))
+                e.reparentEntity(id, EntityId{});
+            ImGui::Separator();
+            if (ImGui::MenuItem("Copy", "Ctrl+C")) e.copyEntity(id);
+            if (ImGui::MenuItem("Paste", "Ctrl+V", false, !e.clipEntities.empty()))
+                e.pasteEntity(id);
+            if (ImGui::MenuItem("Paste as Sibling", nullptr, false,
+                                !e.clipEntities.empty()))
+                e.pasteEntity(ent->parent);
+            if (ImGui::MenuItem("Paste Component", nullptr, false,
+                                e.hasClipComponent))
+                e.pasteComponent(id);
             if (ImGui::MenuItem("Rename")) {
                 renameTarget = id;
                 std::snprintf(renameBuf, sizeof(renameBuf), "%s", ent->name.c_str());
@@ -295,6 +317,11 @@ private:
         }
 
         if (ImGui::BeginPopupContextItem("compctx")) {
+            if (ImGui::MenuItem("Copy Component")) e.copyComponent(id, type);
+            if (ImGui::MenuItem("Paste Component", nullptr, false,
+                                e.hasClipComponent))
+                e.pasteComponent(id);
+            ImGui::Separator();
             if (ImGui::MenuItem("Remove Component")) {
                 ImGui::EndPopup();
                 ImGui::PopID();

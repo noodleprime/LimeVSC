@@ -267,6 +267,20 @@ public:
     bool     redoLast();
 
     void   seedStartScene();
+
+    std::vector<Node> clipNodes;
+    std::vector<Link> clipLinks;
+    void   copySelection();
+    void   pasteClipboard();
+
+    std::vector<Entity> clipEntities;
+    void   copyEntity(EntityId id);
+    void   pasteEntity(EntityId into);
+
+    Component clipComponent;
+    bool      hasClipComponent = false;
+    void   copyComponent(EntityId id, const std::string& type);
+    void   pasteComponent(EntityId id);
     void   rescanAssets();
     void   queueAssetScan();
     void   queueOpenProject(const std::string& root);
