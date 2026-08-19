@@ -1520,8 +1520,10 @@ void drawGraphWindows(EditorContext& e) {
             d.dirty ? d.displayName() + " *###limedoc" + std::to_string(d.id)
                     : title;
 
-        if (const ImGuiWindow* w = ImGui::FindWindowByName(label.c_str()))
+        if (ImGuiWindow* w = ImGui::FindWindowByName(label.c_str())) {
             if (w->DockId) g_graphDock = w->DockId;
+            if (w->DockOrder < 1) w->DockOrder = 1;
+        }
 
         if (ImGui::Begin(label.c_str(), &open)) {
             visible = i;
