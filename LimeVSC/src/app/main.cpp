@@ -298,6 +298,7 @@ void drawNewProject(EditorContext& ed) {
     static char        name[128] = "";
     static std::string where;
     static bool        engine = true;
+    static bool        script = false;
     static bool        primed = false;
 
     if (ed.showNewProject) {
@@ -307,6 +308,7 @@ void drawNewProject(EditorContext& ed) {
                     ? AppSettings::defaultProjectsDir()
                     : ed.settings.projectsDir;
         engine = true;
+        script = false;
         primed = true;
         ImGui::OpenPopup("New Project");
     }
@@ -346,6 +348,14 @@ void drawNewProject(EditorContext& ed) {
     if (ImGui::RadioButton("Framework", !engine)) engine = false;
     ImGui::TextDisabled("Barebones with just the framework of Lime");
 
+    ImGui::Spacing();
+    ImGui::SeparatorText("Main File");
+    if (ImGui::RadioButton("Graph", !script)) script = false;
+    ImGui::TextDisabled("Start from a .lime graph");
+    ImGui::Spacing();
+    if (ImGui::RadioButton("Script", script)) script = true;
+    ImGui::TextDisabled("Start from a plain .lua script");
+
     std::string trimmed(name);
     while (!trimmed.empty() && std::isspace(static_cast<unsigned char>(trimmed.back())))
         trimmed.pop_back();
@@ -384,7 +394,8 @@ void drawNewProject(EditorContext& ed) {
     ImGui::BeginDisabled(!problem.empty());
     if (ImGui::Button("Create", ImVec2(120, 0))) {
         ed.createProjectAt(target.string(),
-                           engine ? ProjectMode::Engine : ProjectMode::Framework);
+                           engine ? ProjectMode::Engine : ProjectMode::Framework,
+                           script);
         ImGui::CloseCurrentPopup();
     }
     ImGui::EndDisabled();

@@ -261,7 +261,8 @@ public:
     void     endCoalescing();
 
     bool showNewProject = false;
-    bool createProjectAt(const std::string& dest, ProjectMode mode);
+    bool createProjectAt(const std::string& dest, ProjectMode mode,
+                         bool mainIsScript = false);
 
     bool     undoLast();
     bool     redoLast();

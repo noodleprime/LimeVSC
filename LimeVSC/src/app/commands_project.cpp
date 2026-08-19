@@ -147,7 +147,8 @@ void collectRuntimeErrors(EditorContext& ed) {
 
 }
 
-bool EditorContext::createProjectAt(const std::string& dest, ProjectMode mode) {
+bool EditorContext::createProjectAt(const std::string& dest, ProjectMode mode,
+                                    bool mainIsScript) {
     const bool engine = mode == ProjectMode::Engine;
 
     Diagnostics d;
@@ -181,10 +182,34 @@ bool EditorContext::createProjectAt(const std::string& dest, ProjectMode mode) {
             "Main");
     }
 
-    newGraph((fs::path(dest) / "content" / "Graphs" / "main.lime").string(),
-             true);
-    if (engine) seedStartScene();
-    saveAndCompile();
+    if (mainIsScript) {
+        const fs::path p = fs::path(dest) / "content" / "Scripts" / "main.lua";
+        std::string body = R"LUA(Lime.onInit:hook(function()
+    Lime.setInitConfig(Lime.Enum.DriverType.Direct3D9, Vec2.new(640, 480))
+end)
+
+)LUA";
+        if (engine) body += R"LUA(require("content.lime_boot")
+
+)LUA";
+        body += R"LUA(Lime.onStart:hook(function()
+    Lime.log("Hello, World!")
+end)
+
+Lime.onUpdate:hook(function(dt)
+end)
+)LUA";
+        std::ofstream f(p, std::ios::binary);
+        if (f) f.write(body.data(), static_cast<std::streamsize>(body.size()));
+        f.close();
+        addDoc();
+        newTextFile(p.string());
+    } else {
+        newGraph((fs::path(dest) / "content" / "Graphs" / "main.lime").string(),
+                 true);
+        if (engine) seedStartScene();
+    }
+    if (!mainIsScript) saveAndCompile();
     project.scan();
     rebuildGraphFunctions();
     report(d);
