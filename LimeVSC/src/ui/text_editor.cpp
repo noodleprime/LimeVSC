@@ -354,16 +354,17 @@ void drawCompletions(EditorContext& e, bool active, ImVec2 boxOrigin,
     if (g_completions.empty()) return;
 
     const int count = static_cast<int>(g_completions.size());
-    if (ImGui::IsKeyPressed(ImGuiKey_DownArrow, true))
-        g_completePick = (g_completePick + 1) % count;
-    if (ImGui::IsKeyPressed(ImGuiKey_UpArrow, true))
-        g_completePick = (g_completePick + count - 1) % count;
+    if (ImGui::GetIO().KeyCtrl) {
+        if (ImGui::IsKeyPressed(ImGuiKey_DownArrow, true))
+            g_completePick = (g_completePick + 1) % count;
+        if (ImGui::IsKeyPressed(ImGuiKey_UpArrow, true))
+            g_completePick = (g_completePick + count - 1) % count;
+    }
     if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
         g_completions.clear();
         return;
     }
-    if (ImGui::IsKeyPressed(ImGuiKey_Tab)
-        || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+    if (ImGui::IsKeyPressed(ImGuiKey_Tab)) {
         g_completeChosen = g_completions[static_cast<std::size_t>(g_completePick)].label;
         g_completeInsert = true;
         g_completions.clear();
@@ -398,6 +399,8 @@ void drawCompletions(EditorContext& e, bool active, ImVec2 boxOrigin,
             ImGui::SameLine();
             ImGui::TextDisabled("%s", c.kind);
         }
+        ImGui::Separator();
+        ImGui::TextDisabled("Ctrl+Up/Down  Tab");
     }
     ImGui::End();
 }
