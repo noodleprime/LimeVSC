@@ -625,10 +625,7 @@ private:
 
         if (openScene || openDocs > 0) {
             ImGui::Spacing();
-            ImGui::TextWrapped("%s open right now and will be closed.",
-                               openScene && openDocs > 0 ? "A scene and tabs are"
-                               : openScene               ? "The scene is"
-                                                         : "Tabs are");
+            ImGui::TextWrapped("Item to delete is currently open");
         }
         if (unsaved)
             ImGui::TextColored(ImVec4(0.89f, 0.66f, 0.29f, 1.0f),
@@ -636,7 +633,7 @@ private:
 
         ImGui::Spacing();
         ImGui::TextColored(ImVec4(0.89f, 0.36f, 0.33f, 1.0f),
-                           "This is permanent. Undo cannot bring it back.");
+                           "Deletion is permanent");
 
         ImGui::Separator();
         if (ImGui::Button("Delete", ImVec2(120, 0))) {
