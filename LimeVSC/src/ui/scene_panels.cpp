@@ -412,15 +412,21 @@ private:
         const std::string cur = e.propValue(*c, &d, p.name);
         const bool overridden = c->value(p.name) != nullptr;
 
-        ImGui::PushID(p.name.c_str());
-        if (!overridden)
-            ImGui::PushStyleColor(ImGuiCol_Text,
-                                  ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-        ImGui::TextUnformatted(p.name.c_str());
-        if (!overridden) ImGui::PopStyleColor();
-        helpMarker(p.doc);
+        const std::string_view propKind = assetKind(p.typeName);
+        const bool namedByPicker = propKind == "Graph" || propKind == "Script";
 
-        if (overridden) {
+        ImGui::PushID(p.name.c_str());
+        if (!namedByPicker) {
+            if (!overridden)
+                ImGui::PushStyleColor(
+                    ImGuiCol_Text,
+                    ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+            ImGui::TextUnformatted(p.name.c_str());
+            if (!overridden) ImGui::PopStyleColor();
+            helpMarker(p.doc);
+        }
+
+        if (overridden && !namedByPicker) {
             ImGui::SameLine();
             if (ImGui::SmallButton("reset")) {
                 ImGui::PopID();
