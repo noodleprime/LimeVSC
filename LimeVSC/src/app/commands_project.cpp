@@ -206,8 +206,7 @@ end)
         std::ofstream f(p, std::ios::binary);
         if (f) f.write(body.data(), static_cast<std::streamsize>(body.size()));
         f.close();
-        addDoc();
-        newTextFile(p.string());
+        openDoc(p.string());
     } else {
         newGraph((fs::path(dest) / "content" / "Graphs" / "main.lime").string(),
                  true);
