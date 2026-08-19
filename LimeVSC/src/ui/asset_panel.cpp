@@ -49,6 +49,7 @@ public:
         drawTree(e);
         drawRenameModal(e);
         drawCreateModal(e);
+        drawDeleteModal(e);
     }
 
 private:
@@ -56,6 +57,7 @@ private:
     char        renameBuf[128] = "";
     bool        openRename = false;
     char        filter[64] = {};
+    std::string deleteTarget;
     std::string createDir;
     int         createKind = 0;
     char        createBuf[128] = "";
@@ -230,6 +232,8 @@ private:
                 fileName(d).c_str(), ImGuiTreeNodeFlags_SpanAvailWidth);
             if (ImGui::BeginPopupContextItem("dctx")) {
                 drawCreateMenu(e, d);
+                ImGui::Separator();
+                if (ImGui::MenuItem("Delete Folder")) deleteTarget = d;
                 ImGui::EndPopup();
             }
             if (open) {
@@ -274,6 +278,12 @@ private:
                               name.substr(0, dot).c_str());
                 openRename = true;
             }
+            ImGui::Separator();
+            if (ImGui::MenuItem("Delete", nullptr, false, !generated))
+                deleteTarget = path;
+            if (generated && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                ImGui::SetTooltip(
+                    "Compiler output. Delete the graph it came from instead.");
             ImGui::Separator();
             drawCreateMenu(e, fs::path(path).parent_path().string());
             ImGui::EndPopup();
@@ -366,6 +376,60 @@ private:
         std::snprintf(createBuf, sizeof(createBuf), "%s", suggested);
         openCreate = true;
         createFocus = true;
+    }
+
+    void drawDeleteModal(EditorContext& e) {
+        namespace fs = std::filesystem;
+        if (!deleteTarget.empty() && !ImGui::IsPopupOpen("Delete"))
+            ImGui::OpenPopup("Delete");
+        ImGui::SetNextWindowSizeConstraints(ImVec2(420, 0),
+                                            ImVec2(420, FLT_MAX));
+        if (!ImGui::BeginPopupModal("Delete", nullptr,
+                                    ImGuiWindowFlags_AlwaysAutoResize))
+            return;
+
+        std::error_code ec;
+        const bool isDir = fs::is_directory(deleteTarget, ec);
+        ImGui::TextWrapped("Delete %s?", fileName(deleteTarget).c_str());
+        ImGui::TextDisabled("%s", deleteTarget.c_str());
+        if (isDir)
+            ImGui::TextDisabled("Everything inside it goes too.");
+        ImGui::TextDisabled("This cannot be undone.");
+
+        ImGui::Separator();
+        if (ImGui::Button("Delete", ImVec2(120, 0))) {
+            std::error_code dec;
+            if (isDir) fs::remove_all(deleteTarget, dec);
+            else {
+                fs::remove(deleteTarget, dec);
+                if (endsWithLime(deleteTarget)) {
+                    std::error_code gec;
+                    const std::string gen = generatedLuaPath(deleteTarget);
+                    fs::remove(gen, gec);
+                    fs::remove(gen + ".map", gec);
+                }
+            }
+            if (dec)
+                e.note(EditorContext::NoteKind::Error,
+                       "could not delete " + fileName(deleteTarget));
+            else
+                e.note(EditorContext::NoteKind::Action,
+                       "Deleted " + fileName(deleteTarget));
+            e.project.scan();
+            e.rescanAssets();
+            deleteTarget.clear();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(120, 0))) {
+            deleteTarget.clear();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
+    static bool endsWithLime(const std::string& p) {
+        return p.size() > 5 && p.compare(p.size() - 5, 5, ".lime") == 0;
     }
 
     void drawCreateModal(EditorContext& e) {
