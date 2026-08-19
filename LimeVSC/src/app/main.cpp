@@ -709,7 +709,7 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR cmdLine, int) {
         wchar_t buf[MAX_PATH]{};
         GetModuleFileNameW(nullptr, buf, MAX_PATH);
         iniPath = (std::filesystem::path(buf).parent_path()
-                   / "limevsc-layout-v9.ini").string();
+                   / "limevsc-layout-v10.ini").string();
         io.IniFilename = iniPath.c_str();
     }
     bool buildLayout = !std::filesystem::exists(iniPath);
@@ -857,11 +857,13 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR cmdLine, int) {
             if (const ImGuiID home = homeDockFor(title))
                 ImGui::SetNextWindowDockID(home, ImGuiCond_FirstUseEver);
 
+            ImGuiWindowClass wc;
+            if (title == "Viewport") {
+                wc.TabItemFlagsOverrideSet = ImGuiTabItemFlags_Leading;
+                ImGui::SetNextWindowClass(&wc);
+            }
+
             if (ImGui::Begin(title.c_str(), &open)) {
-                if (title == "Viewport") {
-                    ImGuiWindow* w = ImGui::GetCurrentWindow();
-                    if (w->DockOrder != 0) w->DockOrder = 0;
-                }
                 if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
                     statusSetArea(title.c_str());
                 p->draw(ed);

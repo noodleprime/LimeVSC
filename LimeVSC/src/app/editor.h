@@ -145,7 +145,6 @@ public:
     std::size_t  openDoc(const std::string& path);
     void         openText(const std::string& path);
     void         adoptProject(const std::string& path);
-    bool         openProjectAt(const std::string& root);
     void         newTextFile(const std::string& path);
     bool         saveText();
     void         noteTextEdit(bool burst);

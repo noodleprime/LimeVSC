@@ -865,40 +865,6 @@ void EditorContext::openStartScene() {
     else               openScene(scene);
 }
 
-bool EditorContext::openProjectAt(const std::string& root) {
-    namespace fs = std::filesystem;
-    std::error_code ec;
-    if (root.empty() || !fs::exists(fs::path(root) / "content", ec)) {
-        log("not a LimeX project: " + root + " (no content/ folder)");
-        settings.forgetProject(root);
-        Diagnostics sd;
-        settings.save(sd);
-        return false;
-    }
-
-    project.root = root;
-    project.limeBuilder = ProjectContext::findLimeBuilder(root);
-    project.scan();
-    rebuildGraphFunctions();
-
-    settings.noteProject(root);
-    Diagnostics sd;
-    settings.save(sd);
-
-    std::string pick;
-    for (const std::string& f : project.limeFiles)
-        if (fs::path(f).filename() == "main.lime") pick = f;
-    if (pick.empty() && !project.limeFiles.empty()) pick = project.limeFiles.front();
-
-    if (pick.empty()) log("opened project " + root + " (no graphs yet)");
-    else              openDoc(pick);
-
-    openStartScene();
-
-    log(std::string("mode: ") + projectModeName(project.mode));
-    return true;
-}
-
 void EditorContext::adoptProject(const std::string& path) {
     const std::filesystem::path content =
         std::filesystem::path(path).parent_path();
