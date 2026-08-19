@@ -1525,9 +1525,6 @@ void drawVariables(EditorContext& e) {
             "##row", ImGuiTreeNodeFlags_SpanAvailWidth
                          | ImGuiTreeNodeFlags_AllowOverlap,
             "%s", v.name.c_str());
-        ImGui::SameLine();
-        ImGui::TextDisabled("%s", v.type.c_str());
-
         if (ImGui::BeginPopupContextItem("vctx")) {
             if (ImGui::MenuItem("Delete")) {
                 const int uses = varUses(g, v.name);
@@ -1542,6 +1539,9 @@ void drawVariables(EditorContext& e) {
             }
             ImGui::EndPopup();
         }
+
+        ImGui::SameLine();
+        ImGui::TextDisabled("%s", v.type.c_str());
 
         if (!open) {
             ImGui::PopID();
