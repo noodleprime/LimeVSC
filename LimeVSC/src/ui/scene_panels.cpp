@@ -128,20 +128,17 @@ public:
             return;
         }
 
+        const float addW = ImGui::CalcTextSize("Add Entity").x
+                           + ImGui::GetStyle().FramePadding.x * 2.0f;
+        const float lineW = ImGui::GetContentRegionAvail().x;
+
+        ImGui::AlignTextToFramePadding();
         ImGui::TextUnformatted(e.scene.name.c_str());
         ImGui::SameLine();
         ImGui::TextDisabled("%s | %zu entities", e.sceneDirty ? "*" : "",
                             e.scene.size());
-
+        ImGui::SameLine(lineW - addW);
         if (ImGui::Button("Add Entity")) e.addEntity("Entity", {});
-        ImGui::SameLine();
-        if (ImGui::Button("Save Scene")) e.saveScene();
-        ImGui::SameLine();
-        ImGui::BeginDisabled(!e.sceneUndo.canUndo());
-        if (ImGui::Button("Undo")) {
-            if (e.sceneUndo.undo(e.scene)) e.sceneDirty = true;
-        }
-        ImGui::EndDisabled();
         ImGui::Separator();
 
         for (EntityId r : e.scene.childrenOf({})) drawEntity(e, r);
