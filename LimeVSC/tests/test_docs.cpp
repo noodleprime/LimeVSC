@@ -423,8 +423,10 @@ TEST_CASE("generated .lua is told apart from hand-written") {
     const std::filesystem::path root =
         std::filesystem::temp_directory_path(ec) / "limevsc_luagen";
     std::filesystem::create_directories(root / "content", ec);
+    std::filesystem::create_directories(root / "content/Scripts/Generated", ec);
     const std::string mine = (root / "content/util.lua").string();
-    const std::string built = (root / "content/main.lua").string();
+    const std::string built =
+        (root / "content/Scripts/Generated/main.lua").string();
     for (const std::string& p : {mine, built, (root / "content/main.lime").string()})
         std::ofstream(p, std::ios::binary) << "x";
 

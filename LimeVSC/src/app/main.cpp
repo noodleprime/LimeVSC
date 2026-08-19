@@ -584,7 +584,7 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR cmdLine, int) {
         wchar_t buf[MAX_PATH]{};
         GetModuleFileNameW(nullptr, buf, MAX_PATH);
         iniPath = (std::filesystem::path(buf).parent_path()
-                   / "limevsc-layout-v5.ini").string();
+                   / "limevsc-layout-v7.ini").string();
         io.IniFilename = iniPath.c_str();
     }
     bool buildLayout = !std::filesystem::exists(iniPath);
@@ -662,7 +662,7 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR cmdLine, int) {
                                           ImGui::GetMainViewport()->WorkSize);
             ImGuiID centre = dockspace;
             const ImGuiID left =
-                ImGui::DockBuilderSplitNode(centre, ImGuiDir_Left, 0.17f, nullptr, &centre);
+                ImGui::DockBuilderSplitNode(centre, ImGuiDir_Left, 0.16f, nullptr, &centre);
             const ImGuiID right =
                 ImGui::DockBuilderSplitNode(centre, ImGuiDir_Right, 0.30f, nullptr, &centre);
             const ImGuiID bottom =

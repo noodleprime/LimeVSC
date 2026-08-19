@@ -50,6 +50,10 @@ struct LoadedMap {
 bool cookScenes(ProjectContext& proj, Diagnostics& diag);
 std::string sceneModuleName(const ProjectContext& proj);
 
+std::string generatedLuaPath(const std::string& limePath);
+std::string graphModuleName(const std::string& limePath);
+bool isGeneratedLuaPath(const std::string& luaPath);
+
 bool compileProject(ProjectContext& proj, const NodeRegistry& nodes,
                     const TypeRegistry& types, const EmitterRegistry& emitters,
                     std::vector<LoadedMap>& mapsOut, Diagnostics& diag);

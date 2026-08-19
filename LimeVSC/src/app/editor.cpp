@@ -10,16 +10,7 @@ namespace lime {
 namespace {
 
 std::string moduleFromPath(const std::string& path) {
-    std::string p = path;
-    for (char& c : p) if (c == '\\') c = '/';
-    const std::size_t at = p.find("content/");
-    std::string rel = at == std::string::npos
-                          ? p.substr(p.find_last_of('/') + 1)
-                          : p.substr(at);
-    if (rel.size() > 5 && rel.compare(rel.size() - 5, 5, ".lime") == 0)
-        rel.resize(rel.size() - 5);
-    for (char& c : rel) if (c == '/') c = '.';
-    return rel;
+    return graphModuleName(path);
 }
 
 }
@@ -84,8 +75,7 @@ bool endsWith(const std::string& s, const char* suffix) {
 }
 
 bool EditorContext::isGeneratedLua(const std::string& path) const {
-    if (!endsWith(path, ".lua")) return false;
-    return std::filesystem::exists(path.substr(0, path.size() - 4) + ".lime");
+    return endsWith(path, ".lua") && isGeneratedLuaPath(path);
 }
 
 void EditorContext::openText(const std::string& path) {
@@ -575,8 +565,9 @@ bool EditorContext::saveAndCompile() {
         return false;
     }
 
-    const std::filesystem::path out =
-        std::filesystem::path(filePath()).replace_extension(".lua");
+    const std::filesystem::path out = generatedLuaPath(filePath());
+    std::error_code oec;
+    std::filesystem::create_directories(out.parent_path(), oec);
     std::ofstream f(out, std::ios::binary);
     if (!f) { log("cannot write " + out.string()); return false; }
     f.write(r.lua.data(), static_cast<std::streamsize>(r.lua.size()));
@@ -671,7 +662,7 @@ bool EditorContext::renameGraph(const std::string& path,
         return false;
     }
 
-    fs::path oldLua = oldPath;  oldLua.replace_extension(".lua");
+    fs::path oldLua = generatedLuaPath(oldPath.string());
     fs::path oldMap = oldLua;   oldMap += ".map";
     fs::remove(oldLua, ec);
     fs::remove(oldMap, ec);

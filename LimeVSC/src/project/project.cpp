@@ -171,7 +171,9 @@ bool compileProject(ProjectContext& proj, const NodeRegistry& nodes,
             continue;
         }
 
-        const fs::path out = fs::path(limePath).replace_extension(".lua");
+        const fs::path out = generatedLuaPath(limePath);
+        std::error_code oec;
+        fs::create_directories(out.parent_path(), oec);
         Diagnostics cd;
         const CompileResult r =
             compileGraph(g, nodes, types, emitters,
@@ -195,6 +197,38 @@ bool compileProject(ProjectContext& proj, const NodeRegistry& nodes,
         ok = cookScenes(proj, diag) && ok;
 
     return ok;
+}
+
+namespace {
+
+const char* const kGenDir = "content/Scripts/Generated/";
+
+std::string slashed(std::string p) {
+    for (char& c : p) if (c == '\\') c = '/';
+    return p;
+}
+
+}
+
+std::string generatedLuaPath(const std::string& limePath) {
+    const std::string p = slashed(limePath);
+    const std::size_t at = p.find("content/");
+    if (at == std::string::npos)
+        return fs::path(limePath).replace_extension(".lua").string();
+    return p.substr(0, at) + kGenDir + fs::path(p).stem().string() + ".lua";
+}
+
+std::string graphModuleName(const std::string& limePath) {
+    const std::string p = slashed(limePath);
+    const std::string stem = fs::path(p).stem().string();
+    if (p.find("content/") == std::string::npos) return stem;
+    std::string rel = std::string(kGenDir) + stem;
+    for (char& c : rel) if (c == '/') c = '.';
+    return rel;
+}
+
+bool isGeneratedLuaPath(const std::string& luaPath) {
+    return slashed(luaPath).find(kGenDir) != std::string::npos;
 }
 
 std::string sceneModuleName(const ProjectContext& proj) {

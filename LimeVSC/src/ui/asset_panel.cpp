@@ -2,11 +2,17 @@
 
 #include <imgui.h>
 
+#include <windows.h>
+#include <shellapi.h>
+
 #include <algorithm>
+#include <cctype>
+#include <cfloat>
 #include <filesystem>
 #include <cstdio>
 #include <cstring>
 #include <string>
+#include <vector>
 
 namespace lime {
 namespace {
@@ -39,12 +45,9 @@ public:
             return;
         }
         drawToolbar(e);
-        if (e.project.isEngine()) drawScenes(e);
-        drawGraphs(e);
-        drawScripts(e);
-        if (e.project.isEngine()) drawAssets(e);
-        drawGenerated(e);
+        drawTree(e);
         drawRenameModal(e);
+        drawCreateModal(e);
     }
 
 private:
@@ -52,15 +55,23 @@ private:
     char        renameBuf[128] = "";
     bool        openRename = false;
     char        filter[64] = {};
+    std::string createDir;
+    int         createKind = 0;
+    char        createBuf[128] = "";
+    bool        openCreate = false;
+    bool        createFocus = false;
 
     static std::string fileName(const std::string& path) {
         return path.substr(path.find_last_of("/\\") + 1);
     }
 
     void drawEmptyState(EditorContext& e) {
-        if (ImGui::Button("New Project...", ImVec2(-1, 0)))
+        const float gap = ImGui::GetStyle().ItemSpacing.x;
+        const float half = (ImGui::GetContentRegionAvail().x - gap) * 0.5f;
+        if (ImGui::Button("New Project...", ImVec2(half, 0)))
             e.commands.invoke("project.new", e);
-        if (ImGui::Button("Open Project...", ImVec2(-1, 0)))
+        ImGui::SameLine();
+        if (ImGui::Button("Open Project...", ImVec2(half, 0)))
             e.commands.invoke("project.open", e);
         ImGui::Spacing();
 
@@ -69,7 +80,18 @@ private:
             return;
         }
 
+        const float clearW = ImGui::CalcTextSize("Clear").x
+                             + ImGui::GetStyle().FramePadding.x * 2.0f;
+        const float lineW = ImGui::GetContentRegionAvail().x;
         ImGui::SeparatorText("Recent");
+        ImGui::SameLine(lineW - clearW);
+        if (ImGui::SmallButton("Clear")) {
+            e.settings.recentProjects.clear();
+            Diagnostics cd;
+            e.settings.save(cd);
+            return;
+        }
+
         const std::vector<std::string> recent = e.settings.recentProjects;
         std::string pick;
         for (const std::string& r : recent) {
@@ -89,13 +111,6 @@ private:
                     "%s%s", r.c_str(),
                     there ? "" : "\n\nThis folder is gone.");
             ImGui::PopID();
-        }
-
-        ImGui::Spacing();
-        if (ImGui::SmallButton("Clear")) {
-            e.settings.recentProjects.clear();
-            Diagnostics d;
-            e.settings.save(d);
         }
 
         if (!pick.empty()) e.queueOpenProject(pick);
@@ -177,63 +192,215 @@ private:
         ImGui::Separator();
     }
 
-    void drawScenes(EditorContext& e) {
-        if (!ImGui::CollapsingHeader("Scenes", ImGuiTreeNodeFlags_DefaultOpen))
-            return;
-        if (e.project.sceneFiles.empty()) {
+    void drawTree(EditorContext& e) {
+        namespace fs = std::filesystem;
+        const std::string root = e.project.contentDir();
+        std::error_code ec;
+        if (root.empty() || !fs::exists(root, ec)) {
             ImGui::TextDisabled("%s", kEmpty);
             return;
         }
-        for (const std::string& f : e.project.sceneFiles) {
-            const bool open = (f == e.scenePath);
-            ImGui::PushID(f.c_str());
-            if (ImGui::Selectable(fileName(f).c_str(), open) && !open) {
-                if (e.sceneDirty) e.saveScene();
-                e.openScene(f);
-            }
-            if (ImGui::BeginPopupContextItem("sctx")) {
-                if (ImGui::MenuItem("Set as Start Scene")) {
-                    if (f != e.scenePath) e.openScene(f);
-                    e.commands.invoke("scene.setStart", e);
-                }
-                ImGui::EndPopup();
-            }
-            ImGui::PopID();
+
+        ImGui::BeginChild("tree", ImVec2(0, 0), ImGuiChildFlags_None);
+        drawDir(e, root);
+        if (ImGui::BeginPopupContextWindow("rootctx",
+                                           ImGuiPopupFlags_MouseButtonRight
+                                               | ImGuiPopupFlags_NoOpenOverItems)) {
+            drawCreateMenu(e, root);
+            ImGui::EndPopup();
         }
+        ImGui::EndChild();
     }
 
-    void drawGraphs(EditorContext& e) {
-        if (!ImGui::CollapsingHeader("Graphs", ImGuiTreeNodeFlags_DefaultOpen))
-            return;
-        if (e.project.limeFiles.empty()) {
-            ImGui::TextDisabled("%s", kEmpty);
-            return;
+    void drawDir(EditorContext& e, const std::string& dir) {
+        namespace fs = std::filesystem;
+        std::error_code ec;
+        std::vector<std::string> dirs, files;
+        for (const fs::directory_entry& en : fs::directory_iterator(dir, ec)) {
+            if (en.is_directory(ec)) dirs.push_back(en.path().string());
+            else if (en.is_regular_file(ec)) files.push_back(en.path().string());
         }
-        for (const std::string& f : e.project.limeFiles) {
-            const bool hasTab = e.findDoc(f) < e.docs.size();
-            const bool active = (f == e.filePath());
+        std::sort(dirs.begin(), dirs.end());
+        std::sort(files.begin(), files.end());
 
-            ImGui::PushID(f.c_str());
-            if (ImGui::Selectable(fileName(f).c_str(), active))
-                e.openDoc(f);
-            if (hasTab && !active) {
-                ImGui::SameLine();
-                ImGui::TextDisabled("open");
-            }
-            if (ImGui::BeginPopupContextItem("ctx")) {
-                if (ImGui::MenuItem("Open")) e.openDoc(f);
-                if (ImGui::MenuItem("Rename...")) {
-                    renameTarget = f;
-                    const std::string name = fileName(f);
-                    const std::size_t dot = name.find_last_of('.');
-                    std::snprintf(renameBuf, sizeof(renameBuf), "%s",
-                                  name.substr(0, dot).c_str());
-                    openRename = true;
-                }
+        for (const std::string& d : dirs) {
+            ImGui::PushID(d.c_str());
+            const bool open = ImGui::TreeNodeEx(
+                fileName(d).c_str(), ImGuiTreeNodeFlags_SpanAvailWidth);
+            if (ImGui::BeginPopupContextItem("dctx")) {
+                drawCreateMenu(e, d);
                 ImGui::EndPopup();
+            }
+            if (open) {
+                drawDir(e, d);
+                ImGui::TreePop();
             }
             ImGui::PopID();
         }
+        for (const std::string& f : files) drawFile(e, f);
+    }
+
+    void drawFile(EditorContext& e, const std::string& path) {
+        namespace fs = std::filesystem;
+        const std::string ext = fs::path(path).extension().string();
+        const bool isScene = ext == ".limescene";
+        const bool isGraph = ext == ".lime";
+        const bool isLua = ext == ".lua";
+        const bool generated = isLua && e.isGeneratedLua(path);
+
+        bool active = false;
+        if (isScene) active = (path == e.scenePath);
+        else if (isGraph || isLua) active = (path == e.filePath());
+
+        ImGui::PushID(path.c_str());
+        if (generated) ImGui::PushStyleColor(ImGuiCol_Text,
+                                             ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
+        if (ImGui::Selectable(fileName(path).c_str(), active)) openFile(e, path);
+        if (generated) ImGui::PopStyleColor();
+
+        if (ImGui::BeginPopupContextItem("fctx")) {
+            if (isScene || isGraph || isLua)
+                if (ImGui::MenuItem("Open")) openFile(e, path);
+            if (isScene && ImGui::MenuItem("Set as Start Scene")) {
+                if (path != e.scenePath) e.openScene(path);
+                e.commands.invoke("scene.setStart", e);
+            }
+            if (isGraph && ImGui::MenuItem("Rename...")) {
+                renameTarget = path;
+                const std::string name = fileName(path);
+                const std::size_t dot = name.find_last_of('.');
+                std::snprintf(renameBuf, sizeof(renameBuf), "%s",
+                              name.substr(0, dot).c_str());
+                openRename = true;
+            }
+            ImGui::Separator();
+            drawCreateMenu(e, fs::path(path).parent_path().string());
+            ImGui::EndPopup();
+        }
+        ImGui::PopID();
+    }
+
+    static void openFile(EditorContext& e, const std::string& path) {
+        const std::string ext = std::filesystem::path(path).extension().string();
+        if (ext == ".limescene") {
+            if (path == e.scenePath) return;
+            if (e.sceneDirty) e.saveScene();
+            e.openScene(path);
+            return;
+        }
+        if (ext == ".lime" || ext == ".lua") e.openDoc(path);
+    }
+
+    void drawCreateMenu(EditorContext& e, const std::string& dir) {
+        if (ImGui::MenuItem("New Folder...")) beginCreate(dir, 0, "New Folder");
+        ImGui::Separator();
+        if (ImGui::MenuItem("New Graph...")) beginCreate(dir, 1, "graph");
+        if (e.project.isEngine())
+            if (ImGui::MenuItem("New Scene...")) beginCreate(dir, 2, "scene");
+        if (ImGui::MenuItem("New Script...")) beginCreate(dir, 3, "script");
+        ImGui::Separator();
+        if (ImGui::MenuItem("Show in Explorer")) {
+            const std::string arg = "\"" + dir + "\"";
+            ShellExecuteA(nullptr, "open", "explorer.exe", arg.c_str(), nullptr,
+                          SW_SHOWNORMAL);
+        }
+        if (ImGui::MenuItem("Rescan")) e.rescanAssets();
+    }
+
+    void beginCreate(const std::string& dir, int kind, const char* suggested) {
+        createDir = dir;
+        createKind = kind;
+        std::snprintf(createBuf, sizeof(createBuf), "%s", suggested);
+        openCreate = true;
+        createFocus = true;
+    }
+
+    void drawCreateModal(EditorContext& e) {
+        static const char* kTitles[] = {"New Folder", "New Graph", "New Scene",
+                                        "New Script"};
+        if (openCreate) {
+            ImGui::OpenPopup("Create");
+            openCreate = false;
+        }
+        ImGui::SetNextWindowSizeConstraints(ImVec2(380, 0),
+                                            ImVec2(380, FLT_MAX));
+        if (!ImGui::BeginPopupModal("Create", nullptr,
+                                    ImGuiWindowFlags_AlwaysAutoResize))
+            return;
+
+        ImGui::SeparatorText(kTitles[createKind]);
+        ImGui::SetNextItemWidth(-1);
+        if (createFocus) {
+            ImGui::SetKeyboardFocusHere();
+            createFocus = false;
+        }
+        const bool entered =
+            ImGui::InputText("##cname", createBuf, sizeof(createBuf),
+                             ImGuiInputTextFlags_EnterReturnsTrue);
+
+        std::string name(createBuf);
+        while (!name.empty()
+               && std::isspace(static_cast<unsigned char>(name.back())))
+            name.pop_back();
+
+        std::string problem;
+        if (name.empty())
+            problem = "Give it a name.";
+        else if (name.find_first_of("\\/:*?\"<>|") != std::string::npos)
+            problem = "A name cannot contain \\ / : * ? \" < > or |";
+
+        ImGui::TextDisabled("%s", createDir.c_str());
+        if (!problem.empty())
+            ImGui::TextColored(ImVec4(0.89f, 0.36f, 0.33f, 1.0f), "%s",
+                               problem.c_str());
+        else
+            ImGui::TextDisabled(" ");
+
+        ImGui::Separator();
+        ImGui::BeginDisabled(!problem.empty());
+        const bool go = ImGui::Button("Create", ImVec2(120, 0))
+                        || (entered && problem.empty());
+        ImGui::EndDisabled();
+        if (go) {
+            doCreate(e, name);
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(120, 0))) ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+    }
+
+    void doCreate(EditorContext& e, const std::string& name) {
+        namespace fs = std::filesystem;
+        std::error_code ec;
+        const fs::path base(createDir);
+        switch (createKind) {
+        case 0:
+            fs::create_directories(base / name, ec);
+            if (ec) e.note(EditorContext::NoteKind::Error,
+                           "cannot create " + (base / name).string());
+            break;
+        case 1: {
+            const std::string p = (base / (name + ".lime")).string();
+            e.newGraph(p, false);
+            e.saveAndCompile();
+            e.rebuildGraphFunctions();
+            break;
+        }
+        case 2: {
+            const std::string p = (base / (name + ".limescene")).string();
+            e.newScene(p, name);
+            break;
+        }
+        case 3: {
+            const std::string p = (base / (name + ".lua")).string();
+            e.addDoc();
+            e.newTextFile(p);
+            break;
+        }
+        default: break;
+        }
+        e.project.scan();
     }
 
     void drawRenameModal(EditorContext& e) {
@@ -261,105 +428,6 @@ private:
         ImGui::EndPopup();
     }
 
-    void drawAssets(EditorContext& e) {
-        if (!ImGui::CollapsingHeader("Assets", ImGuiTreeNodeFlags_DefaultOpen))
-            return;
-
-        if (ImGui::SmallButton("Rescan")) e.queueAssetScan();
-
-        int missing = 0;
-        for (const AssetRecord& r : e.assets.all())
-            if (r.missing) ++missing;
-        if (missing) {
-            ImGui::SameLine();
-            ImGui::TextColored(ImVec4(1, 0.5f, 0.3f, 1), "%d missing", missing);
-        }
-
-        if (e.assets.size() == 0) {
-            ImGui::TextDisabled("%s", kEmpty);
-            return;
-        }
-        if (e.assets.size() > 12) {
-            ImGui::SetNextItemWidth(-1);
-            ImGui::InputTextWithHint("##filter", "Filter...", filter,
-                                     sizeof(filter));
-        } else {
-            filter[0] = '\0';
-        }
-
-        std::string lastFolder = "\x01";
-        for (const AssetRecord& r : e.assets.all()) {
-            if (!matches(r, filter)) continue;
-            const std::string folder = folderOf(r.relPath);
-            if (folder != lastFolder) {
-                lastFolder = folder;
-                ImGui::SeparatorText(folder.empty() ? "content/" : folder.c_str());
-            }
-            drawAssetRow(r);
-        }
-    }
-
-    static void drawAssetRow(const AssetRecord& r) {
-        ImGui::PushID(r.guid.str().c_str());
-
-        if (r.missing)
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, 0.5f, 0.3f, 1));
-        ImGui::Selectable(fileOf(r.relPath).c_str());
-        if (r.missing) ImGui::PopStyleColor();
-
-        if (ImGui::BeginDragDropSource()) {
-            const AssetGuid g = r.guid;
-            ImGui::SetDragDropPayload("LIME_ASSET", &g, sizeof(AssetGuid));
-            ImGui::TextUnformatted(fileOf(r.relPath).c_str());
-            ImGui::EndDragDropSource();
-        }
-        if (ImGui::IsItemHovered()) {
-            ImGui::BeginTooltip();
-            ImGui::TextUnformatted(r.relPath.c_str());
-            ImGui::TextDisabled("%s | %llu bytes", r.type.c_str(),
-                                static_cast<unsigned long long>(r.size));
-            if (r.missing)
-                ImGui::TextColored(ImVec4(1, 0.5f, 0.3f, 1),
-                                   "File is gone. Restore it, or clear the\n"
-                                   "references that still point at it.");
-            else
-                ImGui::TextDisabled("id %s", r.guid.str().c_str());
-            ImGui::EndTooltip();
-        }
-        ImGui::SameLine();
-        ImGui::TextDisabled("%s", r.type.c_str());
-        ImGui::PopID();
-    }
-
-    void drawScripts(EditorContext& e) {
-        if (!ImGui::CollapsingHeader("Scripts", ImGuiTreeNodeFlags_DefaultOpen))
-            return;
-        bool any = false;
-        for (const std::string& f : e.project.luaFiles) {
-            if (e.isGeneratedLua(f)) continue;
-            any = true;
-            const bool active = (f == e.filePath());
-            ImGui::PushID(f.c_str());
-            if (ImGui::Selectable(fileName(f).c_str(), active)) e.openDoc(f);
-            if (!active && e.findDoc(f) < e.docs.size()) {
-                ImGui::SameLine();
-                ImGui::TextDisabled("open");
-            }
-            ImGui::PopID();
-        }
-        if (!any) ImGui::TextDisabled("%s", kEmpty);
-    }
-
-    void drawGenerated(EditorContext& e) {
-        if (!ImGui::CollapsingHeader("Generated")) return;
-        bool any = false;
-        for (const std::string& f : e.project.luaFiles) {
-            if (!e.isGeneratedLua(f)) continue;
-            any = true;
-            ImGui::TextDisabled("%s", fileName(f).c_str());
-        }
-        if (!any) ImGui::TextDisabled("%s", kEmpty);
-    }
 };
 
 }

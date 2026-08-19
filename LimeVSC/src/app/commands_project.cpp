@@ -166,20 +166,23 @@ bool EditorContext::createProjectAt(const std::string& dest, ProjectMode mode) {
 
     fs::remove(fs::path(dest) / "content" / "main.lua", ec);
 
+    for (const char* sub : {"Scenes", "Graphs", "Scripts", "Assets"})
+        fs::create_directories(fs::path(dest) / "content" / sub, ec);
+
     project.root = dest;
     project.limeBuilder = ProjectContext::findLimeBuilder(dest);
     project.mode = mode;
 
     if (engine) {
-        project.startScene = "content/main.limescene";
+        project.startScene = "content/Scenes/main.limescene";
         project.saveSettings(d);
-        std::error_code sec;
-        fs::create_directories(fs::path(dest) / "content", sec);
-        newScene((fs::path(dest) / "content" / "main.limescene").string(),
-                 "Main");
+        newScene(
+            (fs::path(dest) / "content" / "Scenes" / "main.limescene").string(),
+            "Main");
     }
 
-    newGraph((fs::path(dest) / "content" / "main.lime").string(), true);
+    newGraph((fs::path(dest) / "content" / "Graphs" / "main.lime").string(),
+             true);
     if (engine) seedStartScene();
     saveAndCompile();
     project.scan();

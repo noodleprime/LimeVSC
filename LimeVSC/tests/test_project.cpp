@@ -129,7 +129,8 @@ TEST_CASE("full project workflow" * doctest::skip(false)) {
         CHECK_FALSE(d.hasErrors());
         REQUIRE(maps.size() == 1);
 
-        const fs::path lua = tmp / "content" / "main.lua";
+        const fs::path lua =
+            tmp / "content" / "Scripts" / "Generated" / "main.lua";
         REQUIRE(fs::exists(lua));
         const std::string src = readAll(lua);
         CHECK(src.find("Lime.onStart:hook") != std::string::npos);
