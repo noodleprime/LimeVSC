@@ -233,7 +233,12 @@ private:
             if (ImGui::BeginPopupContextItem("dctx")) {
                 drawCreateMenu(e, d);
                 ImGui::Separator();
-                if (ImGui::MenuItem("Delete Folder")) deleteTarget = d;
+                const bool keep = holdsNeeded(e, d);
+                if (ImGui::MenuItem("Delete Folder", nullptr, false, !keep))
+                    deleteTarget = d;
+                if (keep
+                    && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                    ImGui::SetTooltip("Holds a file the project needs.");
                 ImGui::EndPopup();
             }
             if (open) {
@@ -279,11 +284,15 @@ private:
                 openRename = true;
             }
             ImGui::Separator();
-            if (ImGui::MenuItem("Delete", nullptr, false, !generated))
+            const bool locked = needed(e, path);
+            if (ImGui::MenuItem("Delete", nullptr, false, !generated && !locked))
                 deleteTarget = path;
-            if (generated && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            if ((generated || locked)
+                && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
                 ImGui::SetTooltip(
-                    "Compiler output. Delete the graph it came from instead.");
+                    generated
+                        ? "Compiler output. Delete the graph it came from instead."
+                        : "The project will not build without this.");
             ImGui::Separator();
             drawCreateMenu(e, fs::path(path).parent_path().string());
             ImGui::EndPopup();
@@ -426,6 +435,28 @@ private:
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
+    }
+
+    static bool needed(const EditorContext& e, const std::string& path) {
+        namespace fs = std::filesystem;
+        const std::string name = fs::path(path).filename().string();
+        if (name == "main.lime" || name == "main.lua") return true;
+        if (e.project.startScene.empty()) return false;
+        const fs::path start =
+            (fs::path(e.project.root) / e.project.startScene).lexically_normal();
+        return fs::path(path).lexically_normal() == start;
+    }
+
+    static bool holdsNeeded(const EditorContext& e, const std::string& dir) {
+        namespace fs = std::filesystem;
+        std::error_code ec;
+        for (auto it = fs::recursive_directory_iterator(dir, ec);
+             it != fs::recursive_directory_iterator(); it.increment(ec)) {
+            if (ec) break;
+            if (it->is_regular_file(ec) && needed(e, it->path().string()))
+                return true;
+        }
+        return false;
     }
 
     static bool endsWithLime(const std::string& p) {
