@@ -85,6 +85,8 @@ void statusSetArea(const char* area) { g_area = area ? area : ""; }
 
 void statusSetItemHover() { g_itemHover = true; }
 
+ImTextureID statusLogo() { return g_logo; }
+
 void statusInitLogo(void* d3d11Device) {
     if (g_logo || !d3d11Device) return;
     g_logo = reinterpret_cast<ImTextureID>(createLogoTexture(d3d11Device));

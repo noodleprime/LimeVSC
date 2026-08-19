@@ -2,6 +2,8 @@
 
 #include "app/editor.h"
 
+#include <imgui.h>
+
 #include <memory>
 #include <vector>
 
@@ -34,6 +36,7 @@ void statusSetItemHover();
 
 std::string pickFolder(const char* title, const std::string& startAt = {});
 void statusInitLogo(void* d3d11Device);
+ImTextureID statusLogo();
 void* createLogoTexture(void* d3d11Device);
 void setGraphDockId(unsigned int dockId);
 unsigned int graphDockId();

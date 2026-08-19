@@ -294,6 +294,120 @@ void drawLoading(EditorContext& ed) {
 bool        g_showSettings = false;
 std::string g_pendingRecent;
 
+bool g_showWelcome = true;
+
+void drawWelcome(EditorContext& ed) {
+    if (!g_showWelcome) return;
+    if (ed.project.valid()) {
+        g_showWelcome = false;
+        return;
+    }
+
+    const ImGuiViewport* vp = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(vp->WorkPos, ImGuiCond_Always);
+    ImGui::SetNextWindowSize(vp->WorkSize, ImGuiCond_Always);
+
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(28, 24));
+    if (!ImGui::Begin("##welcome", nullptr,
+                      ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoDocking
+                          | ImGuiWindowFlags_NoSavedSettings
+                          | ImGuiWindowFlags_NoMove
+                          | ImGuiWindowFlags_NoBringToFrontOnFocus)) {
+        ImGui::End();
+        ImGui::PopStyleVar();
+        return;
+    }
+    ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
+
+    constexpr float kColumns = 860.0f;
+    const float slack = ImGui::GetContentRegionAvail().x - kColumns;
+    if (slack > 0.0f) ImGui::Indent(slack * 0.5f);
+    const float top = ImGui::GetContentRegionAvail().y;
+    if (top > 620.0f) ImGui::Dummy(ImVec2(0, (top - 620.0f) * 0.35f));
+
+    constexpr float kLogo = 56.0f;
+    const ImTextureID logo = statusLogo();
+    if (logo) {
+        ImGui::Image(logo, ImVec2(kLogo, kLogo));
+        ImGui::SameLine(0, 16);
+    }
+    ImGui::BeginGroup();
+    if (logo) {
+        const float lead = (kLogo - ImGui::GetTextLineHeight()) * 0.5f
+                           - ImGui::GetStyle().ItemSpacing.y;
+        if (lead > 0.0f) ImGui::Dummy(ImVec2(0, lead));
+    }
+    ImGui::TextUnformatted("LimeVSC");
+    ImGui::SameLine(0, 10);
+    ImGui::TextDisabled("v%s", LIMEVSC_VERSION);
+    ImGui::EndGroup();
+
+    ImGui::Dummy(ImVec2(0, 20));
+
+    const float gap = ImGui::GetStyle().ItemSpacing.x * 3.0f;
+    const float colW =
+        ((slack > 0.0f ? kColumns : ImGui::GetContentRegionAvail().x) - gap)
+        * 0.5f;
+
+    ImGui::BeginGroup();
+    ImGui::SetNextItemWidth(colW);
+    if (ImGui::Button("New Project...", ImVec2(colW, 40))) {
+        ed.commands.invoke("project.new", ed);
+        g_showWelcome = false;
+    }
+    ImGui::TextDisabled("Start something from scratch");
+    ImGui::Spacing();
+    if (ImGui::Button("Open Project...", ImVec2(colW, 40))) {
+        ed.commands.invoke("project.open", ed);
+        g_showWelcome = false;
+    }
+    ImGui::TextDisabled("Point at a folder you already have");
+    ImGui::EndGroup();
+
+    ImGui::SameLine(0, gap);
+
+    ImGui::BeginGroup();
+    if (ed.settings.recentProjects.empty()) {
+        ImGui::TextDisabled("Nothing yet.");
+    } else {
+        ImGui::BeginChild("recent", ImVec2(colW, 340), ImGuiChildFlags_None);
+        std::string pick;
+        for (const std::string& r : ed.settings.recentProjects) {
+            std::error_code ec;
+            const bool there = std::filesystem::exists(r, ec);
+            const std::string name =
+                std::filesystem::path(r).filename().string();
+
+            ImGui::PushID(r.c_str());
+            if (!there)
+                ImGui::PushStyleColor(
+                    ImGuiCol_Text,
+                    ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+            if (ImGui::Selectable(name.c_str(), false,
+                                  ImGuiSelectableFlags_AllowDoubleClick)
+                && there)
+                pick = r;
+            if (!there) ImGui::PopStyleColor();
+
+            ImGui::PushStyleColor(ImGuiCol_Text,
+                                  ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+            ImGui::TextUnformatted(there ? r.c_str() : "missing");
+            ImGui::PopStyleColor();
+            ImGui::Spacing();
+            ImGui::PopID();
+        }
+        ImGui::EndChild();
+        if (!pick.empty()) {
+            ed.queueOpenProject(pick);
+            g_showWelcome = false;
+        }
+    }
+    ImGui::EndGroup();
+
+    ImGui::End();
+    ImGui::PopStyleVar();
+}
+
 void drawNewProject(EditorContext& ed) {
     static char        name[128] = "";
     static std::string where;
@@ -721,6 +835,7 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR cmdLine, int) {
         drawMenuBar(ed, running, panels);
         drawSettings(ed);
         drawNewProject(ed);
+        drawWelcome(ed);
         drawLoading(ed);
         if (!g_pendingRecent.empty()) {
             ed.queueOpenProject(g_pendingRecent);
