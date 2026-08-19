@@ -460,6 +460,9 @@ void drawTextDocument(EditorContext& e) {
     const ImVec2 boxSize(-FLT_MIN, avail.y);
     const ImVec2 cursorBefore = ImGui::GetCursorScreenPos();
 
+    if (!g_completions.empty())
+        ImGui::SetKeyOwner(ImGuiKey_Tab, ImGui::GetID("##completing"));
+
     const bool edited = ImGui::InputTextMultiline(
         "##lua", d.text.data(), d.text.capacity() + 1, boxSize,
         ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_CallbackResize
