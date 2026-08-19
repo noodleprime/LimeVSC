@@ -137,6 +137,30 @@ void countLines(const std::string& text) {
     g_lineCount = n;
 }
 
+const LuaDiagnostic* errorOn(const EditorContext& e, int line) {
+    for (const LuaDiagnostic& x : e.luaErrors)
+        if (x.line == line) return &x;
+    return nullptr;
+}
+
+void drawErrorLines(const EditorContext& e, ImVec2 origin, float lineHeight,
+                    ImVec2 area) {
+    if (e.luaErrors.empty()) return;
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    dl->PushClipRect(ImVec2(origin.x, origin.y),
+                     ImVec2(origin.x + area.x, origin.y + area.y), true);
+    for (const LuaDiagnostic& x : e.luaErrors) {
+        const float y = origin.y + static_cast<float>(x.line - 1) * lineHeight;
+        dl->AddRectFilled(ImVec2(origin.x, y),
+                          ImVec2(origin.x + area.x, y + lineHeight),
+                          IM_COL32(210, 70, 60, 34));
+        dl->AddLine(ImVec2(origin.x, y + lineHeight - 1.0f),
+                    ImVec2(origin.x + area.x, y + lineHeight - 1.0f),
+                    IM_COL32(226, 92, 84, 190));
+    }
+    dl->PopClipRect();
+}
+
 bool wantsLua(const EditorContext& e) {
     return EditorContext::isLuaPath(e.doc().filePath);
 }
@@ -207,10 +231,10 @@ void drawTextDocument(EditorContext& e) {
                            "| generated - the next build overwrites this");
     }
     if (!e.luaErrors.empty()) {
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.45f, 0.4f, 1.0f));
-        for (const LuaDiagnostic& x : e.luaErrors)
-            ImGui::Text("line %d: %s", x.line, x.message.c_str());
-        ImGui::PopStyleColor();
+        ImGui::SameLine();
+        ImGui::TextColored(ImVec4(0.95f, 0.42f, 0.38f, 1.0f), "| %zu error%s",
+                           e.luaErrors.size(),
+                           e.luaErrors.size() == 1 ? "" : "s");
     }
     ImGui::Separator();
 
@@ -224,8 +248,15 @@ void drawTextDocument(EditorContext& e) {
                           | ImGuiWindowFlags_NoScrollWithMouse);
     static float syncedScroll = 0.0f;
     ImGui::SetScrollY(syncedScroll);
-    for (int i = 1; i <= g_lineCount; ++i)
-        ImGui::TextDisabled("%4d", i);
+    for (int i = 1; i <= g_lineCount; ++i) {
+        const LuaDiagnostic* bad = errorOn(e, i);
+        if (bad) {
+            ImGui::TextColored(ImVec4(0.95f, 0.42f, 0.38f, 1.0f), "%4d", i);
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", bad->message.c_str());
+        } else {
+            ImGui::TextDisabled("%4d", i);
+        }
+    }
     ImGui::EndChild();
     ImGui::SameLine(0, 2);
 
@@ -252,6 +283,9 @@ void drawTextDocument(EditorContext& e) {
     if (ImGui::IsItemDeactivatedAfterEdit()) e.endTextBurst();
 
     const ImVec2 pad = ImGui::GetStyle().FramePadding;
+    drawErrorLines(e, ImVec2(cursorBefore.x, cursorBefore.y + pad.y - syncedScroll),
+                   lineHeight, avail);
+
     if (wantsLua(e))
         drawHighlight(d.text, ImVec2(cursorBefore.x + pad.x,
                                      cursorBefore.y + pad.y - syncedScroll),
