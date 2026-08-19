@@ -403,6 +403,22 @@ private:
         createFocus = true;
     }
 
+    static bool underPath(const std::string& root, const std::string& other) {
+        namespace fs = std::filesystem;
+        if (other.empty()) return false;
+        const std::string r = fs::path(root).lexically_normal().generic_string();
+        const std::string o = fs::path(other).lexically_normal().generic_string();
+        return o == r
+               || (o.size() > r.size() && o.compare(0, r.size(), r) == 0
+                   && o[r.size()] == '/');
+    }
+
+    static bool anyDirty(const EditorContext& e, const std::string& root) {
+        for (const auto& d : e.docs)
+            if (d->dirty && underPath(root, d->filePath)) return true;
+        return false;
+    }
+
     void drawDeleteModal(EditorContext& e) {
         namespace fs = std::filesystem;
         if (!deleteTarget.empty() && !ImGui::IsPopupOpen("Delete"))
@@ -417,9 +433,42 @@ private:
         const bool isDir = fs::is_directory(deleteTarget, ec);
         ImGui::TextWrapped("Delete %s?", fileName(deleteTarget).c_str());
         ImGui::TextDisabled("%s", deleteTarget.c_str());
-        if (isDir)
-            ImGui::TextDisabled("Everything inside it goes too.");
-        ImGui::TextDisabled("This cannot be undone.");
+
+        if (isDir) {
+            int files = 0, dirs = 0;
+            for (auto it = fs::recursive_directory_iterator(deleteTarget, ec);
+                 it != fs::recursive_directory_iterator(); it.increment(ec)) {
+                if (ec) break;
+                if (it->is_directory(ec)) ++dirs;
+                else ++files;
+            }
+            ImGui::Spacing();
+            ImGui::TextWrapped("%d file%s and %d folder%s inside it go too.",
+                               files, files == 1 ? "" : "s", dirs,
+                               dirs == 1 ? "" : "s");
+        }
+
+        const bool openScene = !e.scenePath.empty()
+                               && underPath(deleteTarget, e.scenePath);
+        int openDocs = 0;
+        for (const auto& d : e.docs)
+            if (underPath(deleteTarget, d->filePath)) ++openDocs;
+        const bool unsaved = (openScene && e.sceneDirty) || anyDirty(e, deleteTarget);
+
+        if (openScene || openDocs > 0) {
+            ImGui::Spacing();
+            ImGui::TextWrapped("%s open right now and will be closed.",
+                               openScene && openDocs > 0 ? "A scene and tabs are"
+                               : openScene               ? "The scene is"
+                                                         : "Tabs are");
+        }
+        if (unsaved)
+            ImGui::TextColored(ImVec4(0.89f, 0.66f, 0.29f, 1.0f),
+                               "There are unsaved changes. They will be lost.");
+
+        ImGui::Spacing();
+        ImGui::TextColored(ImVec4(0.89f, 0.36f, 0.33f, 1.0f),
+                           "This is permanent. Undo cannot bring it back.");
 
         ImGui::Separator();
         if (ImGui::Button("Delete", ImVec2(120, 0))) {
