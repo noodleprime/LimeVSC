@@ -1543,22 +1543,6 @@ void drawVariables(EditorContext& e) {
             ImGui::EndPopup();
         }
 
-        const float xw = ImGui::GetFrameHeight();
-        ImGui::SameLine(ImGui::GetContentRegionMax().x - xw);
-        if (ImGui::SmallButton("x")) {
-            const int uses = varUses(g, v.name);
-            if (uses > 0) {
-                dropName = v.name;
-                dropIndex = static_cast<int>(i);
-                dropUses = uses;
-                askDrop = true;
-            } else {
-                removeAt = static_cast<int>(i);
-            }
-        }
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Remove this variable");
-
         if (!open) {
             ImGui::PopID();
             continue;
