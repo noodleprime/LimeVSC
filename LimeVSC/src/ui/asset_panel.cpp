@@ -4,6 +4,7 @@
 
 #include <windows.h>
 #include <shellapi.h>
+#include <commdlg.h>
 
 #include <algorithm>
 #include <cctype>
@@ -291,6 +292,56 @@ private:
         if (ext == ".lime" || ext == ".lua") e.openDoc(path);
     }
 
+    static void importInto(EditorContext& e, const std::string& dir) {
+        char buf[8192] = {};
+        OPENFILENAMEA ofn{};
+        ofn.lStructSize = sizeof(ofn);
+        ofn.lpstrFilter = "All files\0*.*\0";
+        ofn.lpstrFile = buf;
+        ofn.nMaxFile = sizeof(buf);
+        ofn.lpstrTitle = "Import into this folder";
+        ofn.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_ALLOWMULTISELECT
+                    | OFN_EXPLORER | OFN_NOCHANGEDIR;
+        if (!GetOpenFileNameA(&ofn)) return;
+
+        namespace fs = std::filesystem;
+        std::vector<fs::path> picked;
+        const std::string head(buf);
+        const char* p = buf + head.size() + 1;
+        if (*p == 0) {
+            picked.push_back(fs::path(head));
+        } else {
+            while (*p) {
+                picked.push_back(fs::path(head) / p);
+                p += std::strlen(p) + 1;
+            }
+        }
+
+        int copied = 0;
+        for (const fs::path& src : picked) {
+            std::error_code ec;
+            const fs::path dst = fs::path(dir) / src.filename();
+            if (fs::exists(dst, ec)) {
+                e.note(EditorContext::NoteKind::Warning,
+                       src.filename().string() + " is already here");
+                continue;
+            }
+            fs::copy_file(src, dst, ec);
+            if (ec)
+                e.note(EditorContext::NoteKind::Error,
+                       "could not import " + src.filename().string());
+            else
+                ++copied;
+        }
+        if (copied > 0) {
+            e.note(EditorContext::NoteKind::Action,
+                   "Imported " + std::to_string(copied)
+                       + (copied == 1 ? " file" : " files"));
+            e.rescanAssets();
+            e.project.scan();
+        }
+    }
+
     void drawCreateMenu(EditorContext& e, const std::string& dir) {
         if (ImGui::MenuItem("New Folder...")) beginCreate(dir, 0, "New Folder");
         ImGui::Separator();
@@ -298,6 +349,8 @@ private:
         if (e.project.isEngine())
             if (ImGui::MenuItem("New Scene...")) beginCreate(dir, 2, "scene");
         if (ImGui::MenuItem("New Script...")) beginCreate(dir, 3, "script");
+        ImGui::Separator();
+        if (ImGui::MenuItem("Import Asset...")) importInto(e, dir);
         ImGui::Separator();
         if (ImGui::MenuItem("Show in Explorer")) {
             const std::string arg = "\"" + dir + "\"";
