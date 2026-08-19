@@ -304,14 +304,36 @@ private:
 
         for (const std::string& d : dirs) {
             ImGui::PushID(d.c_str());
-            const bool open = ImGui::TreeNodeEx(
-                fileName(d).c_str(), ImGuiTreeNodeFlags_SpanAvailWidth);
+            ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_SpanAvailWidth
+                                       | ImGuiTreeNodeFlags_OpenOnArrow
+                                       | ImGuiTreeNodeFlags_OpenOnDoubleClick;
+            if (isSelected(d)) flags |= ImGuiTreeNodeFlags_Selected;
+
+            const ImVec2 rowTop = ImGui::GetCursorScreenPos();
+            const bool open = ImGui::TreeNodeEx(fileName(d).c_str(), flags);
+            rowOrder.push_back(d);
+            rowMin.push_back(rowTop);
+            rowMax.push_back(ImGui::GetItemRectMax());
+            if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
+                clickRow(d);
+
             if (ImGui::BeginPopupContextItem("dctx")) {
                 drawCreateMenu(e, d);
                 ImGui::Separator();
                 const bool keep = holdsNeeded(e, d);
-                if (ImGui::MenuItem("Delete Folder", nullptr, false, !keep))
+                const bool pickedDir = isSelected(d);
+                const int manyDirs =
+                    pickedDir ? static_cast<int>(selected.size()) : 1;
+                char dlabel[48];
+                if (manyDirs > 1)
+                    std::snprintf(dlabel, sizeof(dlabel), "Delete %d items",
+                                  manyDirs);
+                else
+                    std::snprintf(dlabel, sizeof(dlabel), "Delete Folder");
+                if (ImGui::MenuItem(dlabel, nullptr, false, !keep)) {
+                    if (!pickedDir) selected.assign(1, d);
                     deleteTarget = d;
+                }
                 if (keep
                     && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
                     ImGui::SetTooltip("Holds a file the project needs.");
