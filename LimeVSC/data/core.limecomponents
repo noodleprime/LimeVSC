@@ -1,0 +1,107 @@
+[[component]]
+id       = "Transform"
+display  = "Transform"
+category = "Core"
+doc      = "Where the entity sits, how it is turned, and how big it is."
+color    = "e0a030ff"
+prop = [
+  { name = "position", type = "Vec3", default = "Vec3.new(0, 0, 0)", doc = "World position, in engine units." },
+  { name = "rotation", type = "Vec3", default = "Vec3.new(0, 0, 0)", doc = "Euler angles in degrees." },
+  { name = "scale",    type = "Vec3", default = "Vec3.new(1, 1, 1)", doc = "Size multiplier per axis." },
+]
+
+[[component]]
+id       = "Behaviour"
+display  = "Behaviour"
+category = "Core"
+doc      = "Runs a .lime graph for this entity."
+color    = "7ec86aff"
+unique   = false
+prop = [
+  { name = "graph", type = "Asset:Graph", default = "\"\"", doc = "Path to the .lime graph, relative to content/." },
+]
+
+[[component]]
+id       = "MeshRenderer"
+display  = "Mesh Renderer"
+category = "Rendering"
+doc      = "Draws a 3D model at the entity's transform."
+color    = "5aa0e0ff"
+prop = [
+  { name = "mesh",     type = "Asset:Mesh",     default = "\"\"", doc = "Model file to draw." },
+  { name = "material", type = "Asset:Material", optional = true,  doc = "Overrides the material the model ships with." },
+  { name = "visible",  type = "boolean",        default = "true", doc = "Uncheck to hide without deleting." },
+  { name = "castsShadow", type = "boolean",     default = "true", doc = "Whether this model casts a shadow." },
+]
+
+[[component]]
+id       = "Sprite"
+display  = "Sprite"
+category = "Rendering"
+doc      = "Draws a flat 2D image, for UI and billboards."
+color    = "5aa0e0ff"
+prop = [
+  { name = "image",   type = "Asset:Texture", default = "\"\"", doc = "Image file to draw." },
+  { name = "size",    type = "Vec2",          default = "Vec2.new(100, 100)", doc = "On-screen size in pixels." },
+  { name = "visible", type = "boolean",       default = "true", doc = "Uncheck to hide without deleting." },
+]
+
+[[component]]
+id       = "TextRenderer"
+display  = "Text"
+category = "Rendering"
+doc      = "Draws a line of text on screen."
+color    = "5aa0e0ff"
+prop = [
+  { name = "text",    type = "string",  default = "\"Text\"", doc = "What to display." },
+  { name = "size",    type = "number",  default = "16",       doc = "Font height in pixels." },
+  { name = "visible", type = "boolean", default = "true",     doc = "Uncheck to hide without deleting." },
+]
+
+[[component]]
+id       = "Camera"
+display  = "Camera"
+category = "Rendering"
+doc      = "The eye the world is drawn from."
+color    = "c86ac8ff"
+prop = [
+  { name = "fov",    type = "number",  default = "70",   doc = "Field of view in degrees. Higher sees wider." },
+  { name = "near",   type = "number",  default = "0.1",  doc = "Nothing closer than this is drawn." },
+  { name = "far",    type = "number",  default = "1000", doc = "Nothing further than this is drawn." },
+  { name = "active", type = "boolean", default = "true", doc = "The camera the game starts looking through." },
+]
+
+[[component]]
+id       = "Light"
+display  = "Light"
+category = "Rendering"
+doc      = "Lights the world around the entity."
+color    = "e0d060ff"
+prop = [
+  { name = "color",     type = "Vec3",   default = "Vec3.new(1, 1, 1)", doc = "Light colour as red, green, blue from 0 to 1." },
+  { name = "intensity", type = "number", default = "1",   doc = "How bright the light is." },
+  { name = "range",     type = "number", default = "50",  doc = "How far the light reaches." },
+]
+
+[[component]]
+id       = "Collider"
+display  = "Collider"
+category = "Gameplay"
+doc      = "Gives the entity a shape that other things can bump into."
+color    = "60c090ff"
+prop = [
+  { name = "shape",   type = "string", default = "\"box\"", doc = "box, sphere or mesh." },
+  { name = "size",    type = "Vec3",   default = "Vec3.new(1, 1, 1)", doc = "Extents of the shape." },
+  { name = "trigger", type = "boolean", default = "false", doc = "Detect overlaps without blocking movement." },
+]
+
+[[component]]
+id       = "Tag"
+display  = "Tag"
+category = "Gameplay"
+doc      = "A label gameplay code can search for, such as \"Enemy\" or \"Pickup\"."
+color    = "909090ff"
+unique   = false
+prop = [
+  { name = "name", type = "string", default = "\"\"", doc = "The label to find this entity by." },
+]

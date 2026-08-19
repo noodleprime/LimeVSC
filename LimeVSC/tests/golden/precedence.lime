@@ -1,0 +1,24 @@
+!lime 1
+!module g.precedence
+
+~0 Lime.onStart @ 0 0
+  > out 5.in
+
+~1 core.add @ 0 200
+  = a 1
+  = b 2
+
+~2 core.mul @ 200 200
+  < a 1.ret
+  = b 3
+
+~3 core.sub @ 400 200
+  = a 10
+  < b 2.ret
+
+~4 core.div @ 600 200
+  < a 3.ret
+  = b 4
+
+~5 test.log @ 800 0
+  < msg 4.ret

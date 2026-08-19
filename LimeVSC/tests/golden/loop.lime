@@ -1,0 +1,21 @@
+!lime 1
+!module g.loop
+
+~0 Lime.onStart @ 0 0
+  > out 1.in
+
+~1 core.forNum @ 200 0
+  = from 1
+  = to 5
+  > body 3.in
+  > out 4.in
+
+~2 core.mul @ 200 300
+  < a 1.i
+  = b 2
+
+~3 test.log @ 400 150
+  < msg 2.ret
+
+~4 test.log @ 400 0
+  = msg "after"

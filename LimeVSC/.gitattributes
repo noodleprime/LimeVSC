@@ -1,0 +1,11 @@
+# Line endings here are not a matter of taste.
+#
+# The golden corpus under tests/golden is compared byte for byte against what
+# the compiler emits, and the compiler emits LF. The .lime round-trip tests do
+# the same. If git checked these out as CRLF - which it does by default on
+# Windows - every one of those tests would fail on a fresh clone, for a reason
+# that has nothing to do with the code.
+#
+# Lua 5.4 also rejects a UTF-8 BOM, which is why nothing here is ever written
+# with one; see readLime/readScene.
+* text=auto eol=lf

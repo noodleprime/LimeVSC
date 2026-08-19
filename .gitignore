@@ -403,3 +403,7 @@ FodyWeavers.xsd
 LimeEngine/resources.zip
 *.zip
 *.vsix
+
+/limevsc.ini
+LimeVSC/build/
+LimeVSC/build-rel/

@@ -1,0 +1,49 @@
+!lime 1
+!module content.main
+
+~0 Lime.onStart @ 60 320
+  > out 1.in
+
+~1 core.forNum @ 320 120
+  = from 1
+  = to 3
+  > body 3.in
+  > out 5.in
+
+~2 core.concat @ 320 400
+  = a "iteration "
+  < b 1.i
+
+~3 Lime.log @ 640 260
+  < msg 2.ret
+
+~5 Lime.File.writeFile @ 640 120
+  = data "LIMEVSC_COMPILER_OK"
+  = path "proof.txt"
+  > out 6.in
+
+~6 core.branch @ 940 120
+  < cond 5.ret
+  > false 8.in
+  > true 7.in
+
+~7 Lime.log @ 1240 60
+  = msg "wrote proof"
+  > out 9.in
+
+~8 Lime.log @ 1240 240
+  = msg "write failed"
+  > out 9.in
+
+~9 Lime.close @ 1540 320
+
+~a Lime.onInit @ 60 60
+  > out b.in
+
+~b Lime.setInitConfig @ 320 60
+  = driver Lime.Enum.DriverType.Direct3D9
+  < windowSize c.ret
+
+~c Vec2.new @ 320 -140
+  = x 320
+  = y 240

@@ -1,0 +1,15 @@
+# Fixture for the provider-priority test. Mirrors how data/overrides.limenodes
+# will patch a bad LuaLSProvider descriptor in production.
+
+[[node]]
+id       = "core.add"
+display  = "Overridden Add"
+category = "Patched"
+emit     = "binop"
+target   = "+"
+pure     = true
+pin = [
+  { name="a",   dir="in",  type="number" },
+  { name="b",   dir="in",  type="number" },
+  { name="ret", dir="out", type="number" },
+]

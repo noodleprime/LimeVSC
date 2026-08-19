@@ -1,0 +1,31 @@
+[[type]]
+id      = "Mesh"
+display = "Model"
+ext     = [".obj", ".3ds", ".x", ".md2", ".md3", ".ms3d", ".dae", ".b3d",
+           ".lwo", ".stl", ".ply", ".mesh"]
+
+[[type]]
+id      = "Texture"
+display = "Image"
+ext     = [".png", ".jpg", ".jpeg", ".bmp", ".tga", ".pcx", ".ppm", ".psd",
+           ".dds", ".wal", ".rgb"]
+
+[[type]]
+id      = "Sound"
+display = "Audio"
+ext     = [".wav", ".ogg", ".mp3", ".flac"]
+
+[[type]]
+id      = "Font"
+display = "Font"
+ext     = [".ttf", ".otf", ".xml"]
+
+[[type]]
+id      = "Material"
+display = "Material"
+ext     = [".limematerial"]
+
+[[type]]
+id      = "Shader"
+display = "Shader"
+ext     = [".hlsl", ".glsl", ".fx", ".vert", ".frag"]

@@ -1,0 +1,40 @@
+[[type]]
+name  = "any"
+color = "9E9E9EFF"
+
+[[type]]
+name  = "number"
+color = "4FC3F7FF"
+
+[[type]]
+name  = "string"
+color = "F06292FF"
+
+[[type]]
+name  = "boolean"
+color = "EF5350FF"
+
+[[type]]
+name  = "table"
+color = "FFB74DFF"
+
+[[type]]
+name  = "function"
+color = "BA68C8FF"
+
+[[type]]
+name      = "integer"
+color     = "4DD0E1FF"
+coercesTo = ["number"]
+
+[[type]]
+name  = "Vec2"
+color = "81C784FF"
+
+[[type]]
+name  = "Vec3"
+color = "66BB6AFF"
+
+[[type]]
+name  = "Vec4"
+color = "43A047FF"

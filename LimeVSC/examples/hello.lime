@@ -1,0 +1,15 @@
+!lime 1
+!module content.main
+
+~0 Lime.onStart @ 80 120
+  > out 2.in
+
+~1 core.boolean @ 80 320
+  = value true
+
+~2 core.branch @ 420 120
+  < cond 1.ret
+  > true 3.in
+
+~3 core.raw @ 760 120
+  | Lime.log("Hello from LimeVSC")

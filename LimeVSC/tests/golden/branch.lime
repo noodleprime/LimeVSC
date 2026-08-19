@@ -1,0 +1,28 @@
+!lime 1
+!module g.branch
+
+~0 Lime.onStart @ 0 0
+  > out 1.in
+
+~1 test.compute @ 200 0
+  > out 3.in
+
+~2 core.gt @ 400 200
+  < a 1.ret
+  = b 10
+
+~3 core.branch @ 600 0
+  < cond 2.ret
+  > false 5.in
+  > true 4.in
+
+~4 test.log @ 800 -100
+  = msg "big"
+  > out 6.in
+
+~5 test.log @ 800 100
+  = msg "small"
+  > out 6.in
+
+~6 test.log @ 1000 0
+  = msg "done"

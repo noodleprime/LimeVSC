@@ -1,0 +1,538 @@
+[[node]]
+id       = "Lime.onInit"
+display  = "On Init"
+category = "Lifecycle"
+emit     = "struct:event"
+target   = "Lime.onInit"
+isEvent  = true
+doc      = "Runs before the window exists, for engine configuration."
+pin = [
+  { name="out", dir="out", kind="exec" },
+]
+
+[[node]]
+id       = "Lime.onStart"
+display  = "On Start"
+category = "Lifecycle"
+emit     = "struct:event"
+target   = "Lime.onStart"
+isEvent  = true
+doc      = "Runs once after the window exists."
+pin = [
+  { name="out", dir="out", kind="exec" },
+]
+
+[[node]]
+id       = "Lime.onUpdate"
+display  = "On Update"
+category = "Lifecycle"
+emit     = "struct:event"
+target   = "Lime.onUpdate"
+isEvent  = true
+doc      = "Runs every frame with the delta time in seconds."
+pin = [
+  { name="out", dir="out", kind="exec" },
+  { name="dt",  dir="out", type="number" },
+]
+
+[[node]]
+id       = "Lime.onClose"
+display  = "On Close"
+category = "Lifecycle"
+emit     = "struct:event"
+target   = "Lime.onClose"
+isEvent  = true
+doc      = "Runs during shutdown."
+pin = [
+  { name="out", dir="out", kind="exec" },
+]
+
+[[node]]
+id       = "core.branch"
+display  = "Branch"
+category = "Flow"
+emit     = "struct:branch"
+doc      = "if cond then ... else ... end"
+pin = [
+  { name="in",    dir="in",  kind="exec" },
+  { name="cond",  dir="in",  type="boolean" },
+  { name="true",  dir="out", kind="exec" },
+  { name="false", dir="out", kind="exec" },
+]
+
+[[node]]
+id       = "core.while"
+display  = "While"
+category = "Flow"
+emit     = "struct:while"
+doc      = "while cond do ... end"
+pin = [
+  { name="in",   dir="in",  kind="exec" },
+  { name="cond", dir="in",  type="boolean" },
+  { name="body", dir="out", kind="exec" },
+  { name="out",  dir="out", kind="exec" },
+]
+
+[[node]]
+id       = "core.forNum"
+display  = "For Loop"
+category = "Flow"
+emit     = "struct:fornum"
+doc      = "for i = from, to, step do ... end"
+pin = [
+  { name="in",   dir="in",  kind="exec" },
+  { name="from", dir="in",  type="number", default="1" },
+  { name="to",   dir="in",  type="number", default="10" },
+  { name="step", dir="in",  type="number", optional=true },
+  { name="body", dir="out", kind="exec" },
+  { name="i",    dir="out", type="number" },
+  { name="out",  dir="out", kind="exec" },
+]
+
+[[node]]
+id       = "core.forIn"
+display  = "For Each"
+category = "Flow"
+emit     = "struct:forin"
+doc      = "for k, v in pairs(t) do ... end"
+pin = [
+  { name="in",    dir="in",  kind="exec" },
+  { name="table", dir="in",  type="table" },
+  { name="body",  dir="out", kind="exec" },
+  { name="k",     dir="out", type="any" },
+  { name="v",     dir="out", type="any" },
+  { name="out",   dir="out", kind="exec" },
+]
+
+[[node]]
+id       = "core.break"
+display  = "Break"
+category = "Flow"
+emit     = "struct:break"
+pin = [
+  { name="in", dir="in", kind="exec" },
+]
+
+[[node]]
+id       = "core.return"
+display  = "Return"
+category = "Flow"
+emit     = "struct:return"
+pin = [
+  { name="in",    dir="in", kind="exec" },
+  { name="value", dir="in", type="any", optional=true },
+]
+
+[[node]]
+id       = "core.sequence"
+display  = "Sequence"
+category = "Flow"
+emit     = "struct:sequence"
+doc      = "Runs each output in order."
+pin = [
+  { name="in", dir="in",  kind="exec" },
+  { name="a",  dir="out", kind="exec" },
+  { name="b",  dir="out", kind="exec" },
+  { name="c",  dir="out", kind="exec" },
+]
+
+[[node]]
+id       = "core.number"
+display  = "Number"
+category = "Literal"
+emit     = "literal"
+pure     = true
+pin = [
+  { name="value", dir="in",  type="number", default="0" },
+  { name="ret",   dir="out", type="number" },
+]
+
+[[node]]
+id       = "core.string"
+display  = "String"
+category = "Literal"
+emit     = "literal"
+pure     = true
+pin = [
+  { name="value", dir="in",  type="string", default="" },
+  { name="ret",   dir="out", type="string" },
+]
+
+[[node]]
+id       = "core.boolean"
+display  = "Boolean"
+category = "Literal"
+emit     = "literal"
+pure     = true
+pin = [
+  { name="value", dir="in",  type="boolean", default="false" },
+  { name="ret",   dir="out", type="boolean" },
+]
+
+[[node]]
+id       = "core.nil"
+display  = "Nil"
+category = "Literal"
+emit     = "literal"
+pure     = true
+pin = [
+  { name="ret", dir="out", type="any" },
+]
+
+[[node]]
+id       = "Vec2.new"
+display  = "Make Vec2"
+category = "Math/Vector"
+emit     = "construct"
+target   = "Vec2.new"
+pure     = true
+pin = [
+  { name="x",   dir="in",  type="number", default="0" },
+  { name="y",   dir="in",  type="number", default="0" },
+  { name="ret", dir="out", type="Vec2" },
+]
+
+[[node]]
+id       = "Vec3.new"
+display  = "Make Vec3"
+category = "Math/Vector"
+emit     = "construct"
+target   = "Vec3.new"
+pure     = true
+pin = [
+  { name="x",   dir="in",  type="number", default="0" },
+  { name="y",   dir="in",  type="number", default="0" },
+  { name="z",   dir="in",  type="number", default="0" },
+  { name="ret", dir="out", type="Vec3" },
+]
+
+[[node]]
+id = "core.add"
+display = "Add (+)"
+category = "Math"
+emit = "binop"
+target = "+"
+pure = true
+pin = [
+  { name="a", dir="in", type="number" },
+  { name="b", dir="in", type="number" },
+  { name="ret", dir="out", type="number" },
+]
+
+[[node]]
+id = "core.sub"
+display = "Subtract (-)"
+category = "Math"
+emit = "binop"
+target = "-"
+pure = true
+pin = [
+  { name="a", dir="in", type="number" },
+  { name="b", dir="in", type="number" },
+  { name="ret", dir="out", type="number" },
+]
+
+[[node]]
+id = "core.mul"
+display = "Multiply (*)"
+category = "Math"
+emit = "binop"
+target = "*"
+pure = true
+pin = [
+  { name="a", dir="in", type="number" },
+  { name="b", dir="in", type="number" },
+  { name="ret", dir="out", type="number" },
+]
+
+[[node]]
+id = "core.div"
+display = "Divide (/)"
+category = "Math"
+emit = "binop"
+target = "/"
+pure = true
+pin = [
+  { name="a", dir="in", type="number" },
+  { name="b", dir="in", type="number" },
+  { name="ret", dir="out", type="number" },
+]
+
+[[node]]
+id = "core.mod"
+display = "Modulo (%)"
+category = "Math"
+emit = "binop"
+target = "%"
+pure = true
+pin = [
+  { name="a", dir="in", type="number" },
+  { name="b", dir="in", type="number" },
+  { name="ret", dir="out", type="number" },
+]
+
+[[node]]
+id = "core.pow"
+display = "Power (^)"
+category = "Math"
+emit = "binop"
+target = "^"
+pure = true
+pin = [
+  { name="a", dir="in", type="number" },
+  { name="b", dir="in", type="number" },
+  { name="ret", dir="out", type="number" },
+]
+
+[[node]]
+id = "core.neg"
+display = "Negate (-)"
+category = "Math"
+emit = "unop"
+target = "-"
+pure = true
+pin = [
+  { name="a", dir="in", type="number" },
+  { name="ret", dir="out", type="number" },
+]
+
+[[node]]
+id = "core.concat"
+display = "Concat (..)"
+category = "String"
+emit = "binop"
+target = ".."
+pure = true
+pin = [
+  { name="a", dir="in", type="any" },
+  { name="b", dir="in", type="any" },
+  { name="ret", dir="out", type="string" },
+]
+
+[[node]]
+id = "core.len"
+display = "Length (#)"
+category = "String"
+emit = "unop"
+target = "#"
+pure = true
+pin = [
+  { name="a", dir="in", type="any" },
+  { name="ret", dir="out", type="number" },
+]
+
+[[node]]
+id = "core.eq"
+display = "Equal (==)"
+category = "Logic"
+emit = "binop"
+target = "=="
+pure = true
+pin = [
+  { name="a", dir="in", type="any" },
+  { name="b", dir="in", type="any" },
+  { name="ret", dir="out", type="boolean" },
+]
+
+[[node]]
+id = "core.neq"
+display = "Not Equal (~=)"
+category = "Logic"
+emit = "binop"
+target = "~="
+pure = true
+pin = [
+  { name="a", dir="in", type="any" },
+  { name="b", dir="in", type="any" },
+  { name="ret", dir="out", type="boolean" },
+]
+
+[[node]]
+id = "core.lt"
+display = "Less (<)"
+category = "Logic"
+emit = "binop"
+target = "<"
+pure = true
+pin = [
+  { name="a", dir="in", type="number" },
+  { name="b", dir="in", type="number" },
+  { name="ret", dir="out", type="boolean" },
+]
+
+[[node]]
+id = "core.le"
+display = "Less or Equal (<=)"
+category = "Logic"
+emit = "binop"
+target = "<="
+pure = true
+pin = [
+  { name="a", dir="in", type="number" },
+  { name="b", dir="in", type="number" },
+  { name="ret", dir="out", type="boolean" },
+]
+
+[[node]]
+id = "core.gt"
+display = "Greater (>)"
+category = "Logic"
+emit = "binop"
+target = ">"
+pure = true
+pin = [
+  { name="a", dir="in", type="number" },
+  { name="b", dir="in", type="number" },
+  { name="ret", dir="out", type="boolean" },
+]
+
+[[node]]
+id = "core.ge"
+display = "Greater or Equal (>=)"
+category = "Logic"
+emit = "binop"
+target = ">="
+pure = true
+pin = [
+  { name="a", dir="in", type="number" },
+  { name="b", dir="in", type="number" },
+  { name="ret", dir="out", type="boolean" },
+]
+
+[[node]]
+id = "core.and"
+display = "And"
+category = "Logic"
+emit = "binop"
+target = "and"
+pure = true
+pin = [
+  { name="a", dir="in", type="boolean" },
+  { name="b", dir="in", type="boolean" },
+  { name="ret", dir="out", type="boolean" },
+]
+
+[[node]]
+id = "core.or"
+display = "Or"
+category = "Logic"
+emit = "binop"
+target = "or"
+pure = true
+pin = [
+  { name="a", dir="in", type="boolean" },
+  { name="b", dir="in", type="boolean" },
+  { name="ret", dir="out", type="boolean" },
+]
+
+[[node]]
+id = "core.not"
+display = "Not"
+category = "Logic"
+emit = "unop"
+target = "not"
+pure = true
+pin = [
+  { name="a", dir="in", type="boolean" },
+  { name="ret", dir="out", type="boolean" },
+]
+
+[[node]]
+id       = "core.raw"
+display  = "Raw Lua"
+category = "Advanced"
+emit     = "raw"
+doc      = "Runs a .lua script, or literal Lua you type in."
+pin = [
+  { name="in",  dir="in",  kind="exec" },
+  { name="script", dir="in", type="Asset:Script", optional=true },
+  { name="out", dir="out", kind="exec" },
+]
+
+[[node]]
+id       = "core.comment"
+display  = "Comment"
+category = "Annotation"
+emit     = "struct:comment"
+doc      = "A resizable box that groups nodes."
+pin = []
+
+[[node]]
+id       = "core.reroute"
+display  = "Reroute"
+category = "Annotation"
+emit     = "reroute"
+pure     = true
+doc      = "A wire waypoint that passes its input straight through."
+pin = [
+  { name="in",  dir="in",  type="any" },
+  { name="ret", dir="out", type="any" },
+]
+
+[[node]]
+id       = "behaviour.onSpawn"
+display  = "On Spawn"
+category = "Behaviour"
+doc      = "Runs once when this entity is created."
+emit     = "struct:behaviour"
+target   = "onSpawn"
+isEvent  = true
+color    = "7ec86aff"
+pin = [
+  { name = "out",  dir = "out", kind = "exec" },
+  { name = "self", dir = "out", type = "SceneObject" },
+]
+
+[[node]]
+id       = "behaviour.onTick"
+display  = "On Tick"
+category = "Behaviour"
+doc      = "Runs every frame with dt, the seconds since the last one."
+emit     = "struct:behaviour"
+target   = "onTick"
+isEvent  = true
+color    = "7ec86aff"
+pin = [
+  { name = "out",  dir = "out", kind = "exec" },
+  { name = "self", dir = "out", type = "SceneObject" },
+  { name = "dt",   dir = "out", type = "number" },
+]
+
+[[node]]
+id       = "behaviour.onDestroy"
+display  = "On Destroy"
+category = "Behaviour"
+doc      = "Runs once just before this entity is removed."
+emit     = "struct:behaviour"
+target   = "onDestroy"
+isEvent  = true
+color    = "7ec86aff"
+pin = [
+  { name = "out",  dir = "out", kind = "exec" },
+  { name = "self", dir = "out", type = "SceneObject" },
+]
+
+[[node]]
+id       = "scene.start"
+display  = "Start Scene"
+category = "Scene"
+doc      = "Loads the project's start scene and keeps it ticking."
+emit     = "call"
+target   = "require"
+color    = "c86ac8ff"
+pin = [
+  { name = "in",     dir = "in",  kind = "exec" },
+  { name = "module", dir = "in",  type = "string", default = "\"content.lime_boot\"" },
+  { name = "out",    dir = "out", kind = "exec" },
+]
+
+[[node]]
+id       = "core.reroute.exec"
+display  = "Reroute (exec)"
+category = "Annotation"
+emit     = "reroute.exec"
+doc      = "An exec waypoint that passes control straight through."
+pin = [
+  { name="in",  dir="in",  kind="exec" },
+  { name="out", dir="out", kind="exec" },
+]

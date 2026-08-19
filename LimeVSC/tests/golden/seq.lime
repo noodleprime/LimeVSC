@@ -1,0 +1,12 @@
+!lime 1
+!module g.seq
+
+~0 Lime.onStart @ 0 0
+  > out 1.in
+
+~1 test.log @ 200 0
+  = msg "first"
+  > out 2.in
+
+~2 test.log @ 400 0
+  = msg "second"

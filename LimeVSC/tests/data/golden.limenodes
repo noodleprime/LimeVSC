@@ -1,0 +1,38 @@
+# Node set for the golden corpus. Deliberately independent of LimeX so the
+# expected .lua never shifts because the engine's API stubs were regenerated.
+
+[[node]]
+id = "test.log"
+category = "Test"
+emit = "call"
+target = "test.log"
+pin = [
+  { name="in",  dir="in",  kind="exec" },
+  { name="msg", dir="in",  type="any" },
+  { name="out", dir="out", kind="exec" },
+]
+
+# Pure with a return: the scheduler may inline it, or hoist it to a local when
+# it is shared.
+[[node]]
+id = "test.getValue"
+category = "Test"
+emit = "call"
+target = "test.getValue"
+pure = true
+pin = [
+  { name="ret", dir="out", type="number" },
+]
+
+# Impure with a return: must be sequenced, and bound to a local when consumed.
+[[node]]
+id = "test.compute"
+category = "Test"
+emit = "call"
+target = "test.compute"
+pin = [
+  { name="in",  dir="in",  kind="exec" },
+  { name="n",   dir="in",  type="number", optional=true },
+  { name="ret", dir="out", type="number" },
+  { name="out", dir="out", kind="exec" },
+]
