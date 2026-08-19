@@ -212,11 +212,36 @@ struct Completion {
     const char* kind;
 };
 
+bool isPrefixChar(char c) { return isIdentChar(c) || c == '.' || c == ':'; }
+
 std::string wordBefore(const std::string& text, int at) {
     int i = at;
-    while (i > 0 && isIdentChar(text[static_cast<std::size_t>(i) - 1])) --i;
+    while (i > 0 && isPrefixChar(text[static_cast<std::size_t>(i) - 1])) --i;
     return text.substr(static_cast<std::size_t>(i),
                        static_cast<std::size_t>(at - i));
+}
+
+char lower(char c) {
+    return static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+}
+
+int matchScore(std::string_view word, std::string_view prefix) {
+    if (word.size() < prefix.size()) return -1;
+
+    bool exact = true, nocase = true;
+    for (std::size_t i = 0; i < prefix.size(); ++i) {
+        if (word[i] != prefix[i]) exact = false;
+        if (lower(word[i]) != lower(prefix[i])) { nocase = false; break; }
+    }
+    if (exact) return 0;
+    if (nocase) return 1;
+
+    std::size_t at = 0;
+    for (char c : word) {
+        if (at < prefix.size() && lower(c) == lower(prefix[at])) ++at;
+        if (at == prefix.size()) return 2;
+    }
+    return -1;
 }
 
 void gatherWords(const std::string& text, const std::string& skip,
@@ -245,26 +270,28 @@ std::vector<Completion> completionsFor(const EditorContext& e,
     std::vector<Completion> all;
     if (prefix.empty()) return all;
 
+    std::vector<std::pair<int, Completion>> ranked;
+    const auto offer = [&](std::string label, const char* kind) {
+        const int score = matchScore(label, prefix);
+        if (score < 0) return;
+        for (const auto& [s, c] : ranked)
+            if (c.label == label) return;
+        ranked.push_back({score, {std::move(label), kind}});
+    };
+
     if (wantsLua(e)) {
-        for (const char* k : kKeywords)
-            if (std::string_view(k).compare(0, prefix.size(), prefix) == 0)
-                all.push_back({k, "keyword"});
-        for (const NodeDesc& d : e.nodes.all()) {
-            if (d.target.empty()) continue;
-            if (d.target.compare(0, prefix.size(), prefix) != 0) continue;
-            bool seen = false;
-            for (const Completion& c : all)
-                if (c.label == d.target) { seen = true; break; }
-            if (!seen) all.push_back({d.target, "lime"});
-        }
+        for (const char* k : kKeywords) offer(k, "keyword");
+        for (const NodeDesc& d : e.nodes.all())
+            if (!d.target.empty()) offer(d.target, "lime");
     }
 
     std::vector<Completion> words;
     gatherWords(e.doc().text, prefix, words);
-    for (Completion& w : words)
-        if (w.label.compare(0, prefix.size(), prefix) == 0)
-            all.push_back(std::move(w));
+    for (Completion& w : words) offer(std::move(w.label), "word");
 
+    std::stable_sort(ranked.begin(), ranked.end(),
+                     [](const auto& a, const auto& b) { return a.first < b.first; });
+    for (auto& [score, c] : ranked) all.push_back(std::move(c));
     if (all.size() > 12) all.resize(12);
     return all;
 }
@@ -314,7 +341,8 @@ void drawCompletions(EditorContext& e, bool active, ImVec2 boxOrigin,
     const std::string& text = e.doc().text;
     const int at = std::min(g_completeAt, static_cast<int>(text.size()));
     const std::string prefix = wordBefore(text, at);
-    if (prefix.size() < 2) {
+    const bool dotted = prefix.find_first_of(".:") != std::string::npos;
+    if (prefix.size() < (dotted ? 1u : 2u)) {
         g_completions.clear();
         return;
     }
