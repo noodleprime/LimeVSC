@@ -1,6 +1,7 @@
 #include "ui/panels.h"
 #include "ui/pixel_wire.h"
 #include "ui/canvas_ids.h"
+#include "api/graphfn_provider.h"
 
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -18,6 +19,9 @@ namespace ed = ax::NodeEditor;
 
 namespace lime {
 namespace {
+
+std::string uniqueVarName(const Graph& g);
+std::string defaultFor(const std::string& type);
 
 std::uintptr_t encNode(NodeId n) {
     return static_cast<std::uintptr_t>(encNodeId(n.v));
@@ -979,6 +983,46 @@ private:
         ImGui::EndTooltip();
     }
 
+    static void makeVariableFromPending(EditorContext& e) {
+        Graph& g = e.graph();
+        const bool wantsGet = g_pending.fromDir == PinDir::In;
+
+        VarDecl v;
+        v.name = uniqueVarName(g);
+        v.type = g_pending.type.valid()
+                     ? std::string(e.types.get(g_pending.type).name)
+                     : std::string();
+        if (v.type.empty() || v.type == "any") v.type = "number";
+        v.defaultValue = defaultFor(v.type);
+        g.variables.push_back(v);
+        e.rebuildGraphFunctions();
+
+        const std::string id = wantsGet
+                                   ? graphVarGetId(g.moduleName, v.name)
+                                   : graphVarSetId(g.moduleName, v.name);
+        const NodeDesc* d = e.nodes.find(id);
+        if (!d) {
+            e.note(EditorContext::NoteKind::Warning,
+                   "made " + v.name + " but its node is not ready yet");
+            g_pending = {};
+            return;
+        }
+
+        const NodeId made =
+            e.addNode(*d, g_pending.canvasPos.x, g_pending.canvasPos.y);
+        for (const PinDesc& p : d->pins) {
+            if (p.kind != PinKind::Data) continue;
+            if (p.dir == g_pending.fromDir) continue;
+            const PinId lp = PinId::make(made, p.name);
+            const bool pendingIsOut = g_pending.fromDir == PinDir::Out;
+            e.connect(pendingIsOut ? g_pending.from : lp,
+                      pendingIsOut ? lp : g_pending.from, PinKind::Data);
+            break;
+        }
+        e.selection() = {made};
+        g_pending = {};
+    }
+
     static void drawContextMenus(EditorContext& e) {
         static bool addWasOpen = false;
         const bool addIsOpen = ImGui::IsPopupOpen("canvas.add");
@@ -1010,6 +1054,18 @@ private:
         if (g_pending.active)
             ImGui::TextDisabled("filtered to pins compatible with '%s'",
                                 std::string(g_pending.from.pin.str()).c_str());
+
+        if (g_pending.active && g_pending.kind == PinKind::Data) {
+            if (ImGui::Button("Make Variable", ImVec2(-1, 0))) {
+                makeVariableFromPending(e);
+                ImGui::CloseCurrentPopup();
+                ImGui::EndPopup();
+                return;
+            }
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip(
+                    "Declare a variable of this type and wire it up");
+        }
 
         ImGui::Separator();
         ImGui::BeginChild("list", ImVec2(360, 380));
