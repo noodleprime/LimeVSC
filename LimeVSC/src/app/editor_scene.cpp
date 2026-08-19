@@ -126,6 +126,86 @@ void EditorContext::pasteEntity(EntityId into) {
     if (first.valid()) selectedEntity = first;
 }
 
+bool EditorContext::saveEntityAsPrefab(EntityId id, const std::string& path) {
+    const Entity* root = scene.entity(id);
+    if (!root) return false;
+
+    std::vector<Entity> subtree;
+    collectSubtree(scene, id, subtree);
+
+    Scene out;
+    out.name = root->name;
+    std::vector<std::pair<std::uint32_t, EntityId>> remap;
+    const auto mapped = [&](EntityId old, EntityId& to) {
+        for (const auto& [from, made] : remap)
+            if (from == old.v) { to = made; return true; }
+        return false;
+    };
+    for (const Entity& src : subtree) {
+        EntityId parent{};
+        if (src.id.v != id.v) mapped(src.parent, parent);
+        const EntityId made = out.addEntity(src.name, parent);
+        remap.push_back({src.id.v, made});
+        if (Entity* e = out.entity(made)) e->components = src.components;
+    }
+
+    Diagnostics d;
+    if (!writeSceneFile(path, out, d)) {
+        report(d);
+        return false;
+    }
+    note(NoteKind::Action, "Saved prefab " + fs::path(path).filename().string());
+    if (project.valid()) project.scan();
+    return true;
+}
+
+void EditorContext::newPrefab(const std::string& path, const std::string& name) {
+    scene.clear();
+    scene.name = name;
+    scenePath = path;
+    sceneUndo.clear();
+    selectedEntity = {};
+
+    const EntityId root = scene.addEntity(name, {});
+    if (Entity* e = scene.entity(root)) {
+        Component t;
+        t.type = "Transform";
+        t.setValue("position", "Vec3.new(0, 0, 0)");
+        e->components.push_back(std::move(t));
+    }
+    selectedEntity = root;
+    inspecting = Inspecting::Entity;
+    sceneDirty = true;
+    saveScene();
+}
+
+bool EditorContext::editingPrefab() const {
+    return scenePath.size() > 11
+           && scenePath.compare(scenePath.size() - 11, 11, ".limeprefab") == 0;
+}
+
+bool EditorContext::instantiatePrefab(const std::string& path, EntityId parent) {
+    Scene in;
+    Diagnostics d;
+    if (!readScene(path, in, d)) {
+        report(d);
+        return false;
+    }
+    const std::vector<EntityId> roots = in.childrenOf({});
+    if (roots.empty()) {
+        note(NoteKind::Warning,
+             fs::path(path).filename().string() + " has nothing in it");
+        return false;
+    }
+
+    std::vector<Entity> keep = clipEntities;
+    clipEntities.clear();
+    for (EntityId r : roots) collectSubtree(in, r, clipEntities);
+    pasteEntity(parent);
+    clipEntities = std::move(keep);
+    return true;
+}
+
 void EditorContext::copyComponent(EntityId id, const std::string& type) {
     const Entity* e = scene.entity(id);
     if (!e) return;

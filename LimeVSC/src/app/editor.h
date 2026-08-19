@@ -282,6 +282,11 @@ public:
     bool      hasClipComponent = false;
     void   copyComponent(EntityId id, const std::string& type);
     void   pasteComponent(EntityId id);
+
+    bool   saveEntityAsPrefab(EntityId id, const std::string& path);
+    void   newPrefab(const std::string& path, const std::string& name);
+    bool   editingPrefab() const;
+    bool   instantiatePrefab(const std::string& path, EntityId parent);
     void   rescanAssets();
     void   queueAssetScan();
     void   queueOpenProject(const std::string& root);

@@ -253,7 +253,8 @@ private:
     void drawFile(EditorContext& e, const std::string& path) {
         namespace fs = std::filesystem;
         const std::string ext = fs::path(path).extension().string();
-        const bool isScene = ext == ".limescene";
+        const bool isPrefabFile = ext == ".limeprefab";
+        const bool isScene = ext == ".limescene" || isPrefabFile;
         const bool isGraph = ext == ".lime";
         const bool isLua = ext == ".lua";
         const bool generated = isLua && e.isGeneratedLua(path);
@@ -268,10 +269,23 @@ private:
         if (ImGui::Selectable(fileName(path).c_str(), active)) openFile(e, path);
         if (generated) ImGui::PopStyleColor();
 
+        if (isPrefabFile
+            && ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoHoldToOpenOthers)) {
+            ImGui::SetDragDropPayload("LIME_PREFAB", path.c_str(),
+                                      path.size() + 1);
+            ImGui::TextUnformatted(fileName(path).c_str());
+            ImGui::EndDragDropSource();
+        }
+
         if (ImGui::BeginPopupContextItem("fctx")) {
             if (isScene || isGraph || isLua)
                 if (ImGui::MenuItem("Open")) openFile(e, path);
-            if (isScene && ImGui::MenuItem("Set as Start Scene")) {
+            if (isPrefabFile)
+                if (ImGui::MenuItem("Add to Scene", nullptr, false,
+                                    !e.scenePath.empty()))
+                    e.instantiatePrefab(path, EntityId{});
+            if (isScene && !isPrefabFile
+                && ImGui::MenuItem("Set as Start Scene")) {
                 if (path != e.scenePath) e.openScene(path);
                 e.commands.invoke("scene.setStart", e);
             }
@@ -302,7 +316,7 @@ private:
 
     static void openFile(EditorContext& e, const std::string& path) {
         const std::string ext = std::filesystem::path(path).extension().string();
-        if (ext == ".limescene") {
+        if (ext == ".limescene" || ext == ".limeprefab") {
             if (path == e.scenePath) return;
             if (e.sceneDirty) e.saveScene();
             e.openScene(path);
@@ -368,6 +382,8 @@ private:
         if (e.project.isEngine())
             if (ImGui::MenuItem("New Scene...")) beginCreate(dir, 2, "scene");
         if (ImGui::MenuItem("New Script...")) beginCreate(dir, 3, "script");
+        if (e.project.isEngine())
+            if (ImGui::MenuItem("New Prefab...")) beginCreate(dir, 4, "Prefab");
         ImGui::Separator();
         if (ImGui::MenuItem("Import Asset...")) importInto(e, dir);
         ImGui::Separator();
@@ -465,7 +481,7 @@ private:
 
     void drawCreateModal(EditorContext& e) {
         static const char* kTitles[] = {"New Folder", "New Graph", "New Scene",
-                                        "New Script"};
+                                        "New Script", "New Prefab"};
         if (openCreate) {
             ImGui::OpenPopup("Create");
             openCreate = false;
@@ -546,6 +562,9 @@ private:
             e.newTextFile(p);
             break;
         }
+        case 4:
+            e.newPrefab((base / (name + ".limeprefab")).string(), name);
+            break;
         default: break;
         }
         e.project.scan();

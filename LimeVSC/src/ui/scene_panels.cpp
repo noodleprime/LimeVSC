@@ -2,6 +2,8 @@
 
 #include "api/graphfn_provider.h"
 
+#include <cctype>
+#include <cfloat>
 #include <filesystem>
 
 #include <imgui.h>
@@ -187,6 +189,10 @@ public:
 
         ImGui::AlignTextToFramePadding();
         ImGui::TextUnformatted(e.scene.name.c_str());
+        if (e.editingPrefab()) {
+            ImGui::SameLine();
+            ImGui::TextDisabled("[prefab]");
+        }
         ImGui::SameLine();
         ImGui::TextDisabled("%s | %zu entities", e.sceneDirty ? "*" : "",
                             e.scene.size());
@@ -200,6 +206,9 @@ public:
         if (ImGui::BeginDragDropTarget()) {
             if (const ImGuiPayload* p = ImGui::AcceptDragDropPayload("LIME_ENTITY"))
                 e.reparentEntity(*static_cast<const EntityId*>(p->Data), EntityId{});
+            if (const ImGuiPayload* p = ImGui::AcceptDragDropPayload("LIME_PREFAB"))
+                e.instantiatePrefab(std::string(static_cast<const char*>(p->Data)),
+                                    EntityId{});
             ImGui::EndDragDropTarget();
         }
 
@@ -248,6 +257,9 @@ private:
         if (ImGui::BeginDragDropTarget()) {
             if (const ImGuiPayload* p = ImGui::AcceptDragDropPayload("LIME_ENTITY"))
                 e.reparentEntity(*static_cast<const EntityId*>(p->Data), id);
+            if (const ImGuiPayload* p = ImGui::AcceptDragDropPayload("LIME_PREFAB"))
+                e.instantiatePrefab(std::string(static_cast<const char*>(p->Data)),
+                                    id);
             ImGui::EndDragDropTarget();
         }
 

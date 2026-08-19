@@ -358,3 +358,112 @@ TEST_CASE("unparenting returns an entity to the root") {
     REQUIRE(ed.undoLast());
     CHECK(ed.scene.entity(child)->parent == parent);
 }
+
+TEST_CASE("a prefab round-trips an entity subtree") {
+    EditorContext ed;
+    const EntityId root = ed.addEntity("Turret", {});
+    const EntityId barrel = ed.addEntity("Barrel", root);
+    ed.addEntity("Muzzle", barrel);
+    {
+        Component t;
+        t.type = "Transform";
+        t.setValue("position", "Vec3.new(4, 0, 0)");
+        ed.scene.entity(root)->components.push_back(std::move(t));
+    }
+
+    std::error_code ec;
+    const std::filesystem::path p =
+        std::filesystem::temp_directory_path(ec) / "limevsc_turret.limeprefab";
+    REQUIRE(ed.saveEntityAsPrefab(root, p.string()));
+    REQUIRE(std::filesystem::exists(p));
+
+    EditorContext other;
+    REQUIRE(other.instantiatePrefab(p.string(), {}));
+
+    const std::vector<EntityId> roots = other.scene.childrenOf({});
+    REQUIRE(roots.size() == 1);
+    const Entity* made = other.scene.entity(roots.front());
+    REQUIRE(made != nullptr);
+    CHECK(made->name == "Turret");
+    CHECK(made->component("Transform") != nullptr);
+
+    const std::vector<EntityId> kids = other.scene.childrenOf(made->id);
+    REQUIRE(kids.size() == 1);
+    CHECK(other.scene.entity(kids.front())->name == "Barrel");
+    CHECK(other.scene.childrenOf(kids.front()).size() == 1);
+
+    std::filesystem::remove(p, ec);
+}
+
+TEST_CASE("a prefab dropped on an entity parents under it") {
+    EditorContext ed;
+    const EntityId src = ed.addEntity("Prop", {});
+    std::error_code ec;
+    const std::filesystem::path p =
+        std::filesystem::temp_directory_path(ec) / "limevsc_prop.limeprefab";
+    REQUIRE(ed.saveEntityAsPrefab(src, p.string()));
+
+    const EntityId host = ed.addEntity("Host", {});
+    REQUIRE(ed.instantiatePrefab(p.string(), host));
+
+    const std::vector<EntityId> kids = ed.scene.childrenOf(host);
+    REQUIRE(kids.size() == 1);
+    CHECK(ed.scene.entity(kids.front())->name == "Prop");
+
+    std::filesystem::remove(p, ec);
+}
+
+TEST_CASE("instantiating a prefab leaves the clipboard alone") {
+    EditorContext ed;
+    const EntityId kept = ed.addEntity("Kept", {});
+    ed.copyEntity(kept);
+
+    const EntityId other = ed.addEntity("Other", {});
+    std::error_code ec;
+    const std::filesystem::path p =
+        std::filesystem::temp_directory_path(ec) / "limevsc_other.limeprefab";
+    REQUIRE(ed.saveEntityAsPrefab(other, p.string()));
+    REQUIRE(ed.instantiatePrefab(p.string(), {}));
+
+    REQUIRE(ed.clipEntities.size() == 1);
+    CHECK(ed.clipEntities.front().name == "Kept");
+
+    std::filesystem::remove(p, ec);
+}
+
+TEST_CASE("a new prefab is a scene you can edit and reopen") {
+    EditorContext ed;
+    std::error_code ec;
+    const std::filesystem::path p =
+        std::filesystem::temp_directory_path(ec) / "limevsc_new.limeprefab";
+    std::filesystem::remove(p, ec);
+
+    ed.newPrefab(p.string(), "Crate");
+    CHECK(ed.editingPrefab());
+    CHECK(ed.scene.name == "Crate");
+    REQUIRE(std::filesystem::exists(p));
+
+    const std::vector<EntityId> roots = ed.scene.childrenOf({});
+    REQUIRE(roots.size() == 1);
+    CHECK(ed.scene.entity(roots.front())->component("Transform") != nullptr);
+
+    ed.addEntity("Lid", roots.front());
+    ed.saveScene();
+
+    EditorContext other;
+    other.openScene(p.string());
+    CHECK(other.editingPrefab());
+    const std::vector<EntityId> reopened = other.scene.childrenOf({});
+    REQUIRE(reopened.size() == 1);
+    CHECK(other.scene.childrenOf(reopened.front()).size() == 1);
+
+    std::filesystem::remove(p, ec);
+}
+
+TEST_CASE("a scene is not mistaken for a prefab") {
+    EditorContext ed;
+    ed.scenePath = "C:/game/content/Scenes/main.limescene";
+    CHECK_FALSE(ed.editingPrefab());
+    ed.scenePath.clear();
+    CHECK_FALSE(ed.editingPrefab());
+}
