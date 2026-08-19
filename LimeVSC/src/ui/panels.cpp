@@ -985,7 +985,6 @@ private:
 
     static void makeVariableFromPending(EditorContext& e) {
         Graph& g = e.graph();
-        const bool wantsGet = g_pending.fromDir == PinDir::In;
 
         VarDecl v;
         v.name = uniqueVarName(g);
@@ -997,10 +996,8 @@ private:
         g.variables.push_back(v);
         e.rebuildGraphFunctions();
 
-        const std::string id = wantsGet
-                                   ? graphVarGetId(g.moduleName, v.name)
-                                   : graphVarSetId(g.moduleName, v.name);
-        const NodeDesc* d = e.nodes.find(id);
+        const NodeDesc* d =
+            e.nodes.find(graphVarGetId(g.moduleName, v.name));
         if (!d) {
             e.note(EditorContext::NoteKind::Warning,
                    "made " + v.name + " but its node is not ready yet");
