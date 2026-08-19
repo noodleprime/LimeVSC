@@ -370,7 +370,16 @@ void drawWelcome(EditorContext& ed) {
     if (ed.settings.recentProjects.empty()) {
         ImGui::TextDisabled("Nothing yet.");
     } else {
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10, 10));
         ImGui::BeginChild("recent", ImVec2(colW, 340), ImGuiChildFlags_None);
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
+
+        const float lineH = ImGui::GetTextLineHeight();
+        const float rowH = lineH * 2.0f + 10.0f;
+        const ImU32 dimCol =
+            ImGui::GetColorU32(ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+        const ImU32 nameCol = ImGui::GetColorU32(ImGuiCol_Text);
+
         std::string pick;
         for (const std::string& r : ed.settings.recentProjects) {
             std::error_code ec;
@@ -379,24 +388,24 @@ void drawWelcome(EditorContext& ed) {
                 std::filesystem::path(r).filename().string();
 
             ImGui::PushID(r.c_str());
-            if (!there)
-                ImGui::PushStyleColor(
-                    ImGuiCol_Text,
-                    ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-            if (ImGui::Selectable(name.c_str(), false,
-                                  ImGuiSelectableFlags_AllowDoubleClick)
+            const ImVec2 at = ImGui::GetCursorScreenPos();
+            if (ImGui::Selectable("##row", false,
+                                  ImGuiSelectableFlags_AllowDoubleClick,
+                                  ImVec2(0, rowH))
                 && there)
                 pick = r;
-            if (!there) ImGui::PopStyleColor();
 
-            ImGui::PushStyleColor(ImGuiCol_Text,
-                                  ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-            ImGui::TextUnformatted(there ? r.c_str() : "missing");
-            ImGui::PopStyleColor();
-            ImGui::Spacing();
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            dl->AddText(ImVec2(at.x + 6.0f, at.y + 3.0f),
+                        there ? nameCol : dimCol, name.c_str());
+            dl->AddText(ImVec2(at.x + 6.0f, at.y + 3.0f + lineH), dimCol,
+                        there ? r.c_str() : "missing");
             ImGui::PopID();
         }
+
+        ImGui::PopStyleVar();
         ImGui::EndChild();
+        ImGui::PopStyleVar();
         if (!pick.empty()) {
             ed.queueOpenProject(pick);
             g_showWelcome = false;
