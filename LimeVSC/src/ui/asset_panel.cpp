@@ -58,6 +58,7 @@ private:
     bool        openRename = false;
     char        filter[64] = {};
     std::string deleteTarget;
+    bool        keepContents = false;
     std::vector<std::string> selected;
     std::vector<std::string> rowOrder;
     std::vector<ImVec2>      rowMin, rowMax;
@@ -541,6 +542,39 @@ private:
         return {deleteTarget};
     }
 
+    static void rehomeContents(EditorContext& e, const std::string& dir) {
+        namespace fs = std::filesystem;
+        std::error_code ec;
+        const fs::path up = fs::path(dir).parent_path();
+        if (up.empty()) return;
+
+        std::vector<fs::path> items;
+        for (const fs::directory_entry& en : fs::directory_iterator(dir, ec))
+            items.push_back(en.path());
+
+        int moved = 0;
+        for (const fs::path& src : items) {
+            fs::path dst = up / src.filename();
+            for (int n = 2; fs::exists(dst, ec) && n < 1000; ++n)
+                dst = up
+                      / (src.stem().string() + " (" + std::to_string(n) + ")"
+                         + src.extension().string());
+            std::error_code mec;
+            fs::rename(src, dst, mec);
+            if (mec) {
+                e.note(EditorContext::NoteKind::Error,
+                       "could not move " + src.filename().string());
+                continue;
+            }
+            if (src != dst) e.forgetDeleted(src.string());
+            ++moved;
+        }
+        if (moved > 0)
+            e.note(EditorContext::NoteKind::Action,
+                   "Moved " + std::to_string(moved) + " up to "
+                       + up.filename().string());
+    }
+
     void drawDeleteModal(EditorContext& e) {
         namespace fs = std::filesystem;
         if (!deleteTarget.empty() && !ImGui::IsPopupOpen("Delete"))
@@ -572,9 +606,14 @@ private:
                 else ++files;
             }
             ImGui::Spacing();
-            ImGui::TextWrapped("%d file%s and %d folder%s inside it go too.",
-                               files, files == 1 ? "" : "s", dirs,
-                               dirs == 1 ? "" : "s");
+            if (files + dirs > 0) {
+                ImGui::Checkbox("Move what is inside up one folder",
+                                &keepContents);
+                if (!keepContents)
+                    ImGui::TextWrapped(
+                        "%d file%s and %d folder%s inside it go too.", files,
+                        files == 1 ? "" : "s", dirs, dirs == 1 ? "" : "s");
+            }
         }
 
         const bool openScene = !e.scenePath.empty()
@@ -605,8 +644,10 @@ private:
             int done = 0;
             for (const std::string& t : batch) {
                 std::error_code dec;
-                if (fs::is_directory(t, dec)) fs::remove_all(t, dec);
-                else {
+                if (fs::is_directory(t, dec)) {
+                    if (keepContents) rehomeContents(e, t);
+                    fs::remove_all(t, dec);
+                } else {
                     fs::remove(t, dec);
                     if (endsWithLime(t)) {
                         std::error_code gec;
@@ -631,11 +672,13 @@ private:
             e.rescanAssets();
             selected.clear();
             deleteTarget.clear();
+            keepContents = false;
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
         if (ImGui::Button("Cancel", ImVec2(120, 0))) {
             deleteTarget.clear();
+            keepContents = false;
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
