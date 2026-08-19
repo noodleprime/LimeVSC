@@ -373,6 +373,7 @@ public:
         syncPositions(e);
 
         const ed::NodeId hovered = ed::GetHoveredNode();
+        if (hovered) statusSetItemHover();
 
         ed::Suspend();
         drawHoverTooltip(e, hovered);
@@ -382,8 +383,10 @@ public:
         ed::End();
         canvasDl->Flags = savedAA;
 
-        if (const auto hl = ed::GetHoveredLink())
+        if (const auto hl = ed::GetHoveredLink()) {
             g_lastHoveredLink = static_cast<std::uint64_t>(hl.Get());
+            statusSetItemHover();
+        }
 
         splitLinkOnDoubleClick(e);
         updateWireCarry(e);

@@ -30,6 +30,7 @@ void drawTextDocument(EditorContext& ed);
 void drawStatusBar(EditorContext& ed);
 void drawNotes(EditorContext& ed);
 void statusSetArea(const char* area);
+void statusSetItemHover();
 void statusInitLogo(void* d3d11Device);
 void* createLogoTexture(void* d3d11Device);
 void setGraphDockId(unsigned int dockId);

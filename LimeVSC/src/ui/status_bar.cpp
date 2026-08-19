@@ -20,19 +20,26 @@ namespace {
 
 std::string g_area;
 ImTextureID g_logo = 0;
+bool g_itemHover = false;
+
 
 struct Hint {
     const char* key;
     const char* what;
 };
 
+const std::vector<Hint> kGraphNode = {
+    {"Drag pin", "Connect"},
+    {"2xLMB wire", "Waypoint"},
+    {"Ctrl+LMB pin", "Move wire"},
+};
+
 const std::vector<Hint>& hintsFor(const std::string& area, bool textDoc) {
     static const std::vector<Hint> kGraph = {
-        {"LMB", "Select"},        {"Drag pin", "Connect"},
-        {"2xLMB wire", "Waypoint"},{"Ctrl+LMB pin", "Move wire"},
-        {"RMB", "Add node"},      {"MMB", "Pan"},
-        {"Wheel", "Zoom"},        {"Del", "Delete"},
-        {"C", "Comment"},         {"Ctrl+D", "Duplicate"},
+        {"LMB", "Select"},        {"RMB", "Add node"},
+        {"MMB", "Pan"},           {"Wheel", "Zoom"},
+        {"Del", "Delete"},        {"C", "Comment"},
+        {"Ctrl+D", "Duplicate"},
     };
     static const std::vector<Hint> kText = {
         {"Ctrl+S", "Save"},     {"Ctrl+Z", "Undo"},
@@ -76,6 +83,8 @@ const std::vector<Hint>& hintsFor(const std::string& area, bool textDoc) {
 
 void statusSetArea(const char* area) { g_area = area ? area : ""; }
 
+void statusSetItemHover() { g_itemHover = true; }
+
 void statusInitLogo(void* d3d11Device) {
     if (g_logo || !d3d11Device) return;
     g_logo = reinterpret_cast<ImTextureID>(createLogoTexture(d3d11Device));
@@ -111,10 +120,13 @@ void drawStatusBar(EditorContext& e) {
 
     put(g_area.empty() ? "-" : g_area.c_str(), dim);
     put("|", dim);
-    for (const Hint& h : hintsFor(g_area, e.doc().isText())) {
+    const bool onItem = g_itemHover && g_area == "Graph" && !e.doc().isText();
+    for (const Hint& h : onItem ? kGraphNode
+                                : hintsFor(g_area, e.doc().isText())) {
         put(h.key, bright);
         put(h.what, dim);
     }
+    g_itemHover = false;
 
     const float logoSide = barH - 6.0f;
     const std::string version = std::string("v") + LIMEVSC_VERSION;
