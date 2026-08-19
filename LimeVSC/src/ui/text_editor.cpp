@@ -143,10 +143,9 @@ const LuaDiagnostic* errorOn(const EditorContext& e, int line) {
     return nullptr;
 }
 
-void drawErrorLines(const EditorContext& e, ImVec2 origin, float lineHeight,
-                    ImVec2 area) {
+void drawErrorLines(ImDrawList* dl, const EditorContext& e, ImVec2 origin,
+                    float lineHeight, ImVec2 area) {
     if (e.luaErrors.empty()) return;
-    ImDrawList* dl = ImGui::GetWindowDrawList();
     dl->PushClipRect(ImVec2(origin.x, origin.y),
                      ImVec2(origin.x + area.x, origin.y + area.y), true);
     for (const LuaDiagnostic& x : e.luaErrors) {
@@ -165,9 +164,8 @@ bool wantsLua(const EditorContext& e) {
     return EditorContext::isLuaPath(e.doc().filePath);
 }
 
-void drawHighlight(const std::string& text, ImVec2 origin, float lineHeight,
-                   float scrollY, float viewHeight) {
-    ImDrawList* dl = ImGui::GetWindowDrawList();
+void drawHighlight(ImDrawList* dl, const std::string& text, ImVec2 origin,
+                   float lineHeight, float scrollY, float viewHeight) {
     ImFont* font = ImGui::GetFont();
     const float fontSize = ImGui::GetFontSize();
     const float spaceW = font->CalcTextSizeA(fontSize, FLT_MAX, 0.0f, " ").x;
@@ -376,6 +374,16 @@ void drawCompletions(EditorContext& e, bool active, ImVec2 boxOrigin,
     ImGui::End();
 }
 
+ImGuiWindow* inputChild(const char* label) {
+    ImGuiContext& g = *ImGui::GetCurrentContext();
+    ImGuiWindow* parent = ImGui::GetCurrentWindow();
+    if (!parent) return nullptr;
+    const std::string want = std::string(parent->Name) + "/" + label;
+    for (ImGuiWindow* w : g.Windows)
+        if (std::strncmp(w->Name, want.c_str(), want.size()) == 0) return w;
+    return nullptr;
+}
+
 void drawTextDocument(EditorContext& e) {
     GraphDoc& d = e.doc();
 
@@ -431,7 +439,8 @@ void drawTextDocument(EditorContext& e) {
         editCallback, &d.text);
     const bool boxActive = ImGui::IsItemActive();
 
-    if (ImGuiWindow* box = ImGui::FindWindowByName("##lua")) syncedScroll = box->Scroll.y;
+    ImGuiWindow* box = inputChild("##lua");
+    if (box) syncedScroll = box->Scroll.y;
 
     ImGui::PopStyleColor(2);
 
@@ -442,15 +451,21 @@ void drawTextDocument(EditorContext& e) {
     if (ImGui::IsItemDeactivatedAfterEdit()) e.endTextBurst();
 
     const ImVec2 pad = ImGui::GetStyle().FramePadding;
-    drawErrorLines(e, ImVec2(cursorBefore.x, cursorBefore.y + pad.y - syncedScroll),
-                   lineHeight, avail);
-
-    if (wantsLua(e))
-        drawHighlight(d.text, ImVec2(cursorBefore.x + pad.x,
-                                     cursorBefore.y + pad.y - syncedScroll),
-                      lineHeight, syncedScroll, avail.y);
-    else
-        countLines(d.text);
+    if (box) {
+        ImDrawList* dl = box->DrawList;
+        dl->PushClipRect(box->InnerRect.Min, box->InnerRect.Max, true);
+        drawErrorLines(dl, e,
+                       ImVec2(cursorBefore.x, cursorBefore.y + pad.y - syncedScroll),
+                       lineHeight, avail);
+        if (wantsLua(e))
+            drawHighlight(dl, d.text,
+                          ImVec2(cursorBefore.x + pad.x,
+                                 cursorBefore.y + pad.y - syncedScroll),
+                          lineHeight, syncedScroll, avail.y);
+        else
+            countLines(d.text);
+        dl->PopClipRect();
+    }
 
     drawCompletions(e, boxActive, cursorBefore, lineHeight, pad, syncedScroll);
 
