@@ -93,6 +93,43 @@ std::string fmtLuaString(const std::string& text) {
     return s + "\"";
 }
 
+bool drawBehaviourPicker(EditorContext& e, const char* label,
+                         const std::string& current, std::string& out) {
+    namespace fs = std::filesystem;
+    std::string shown;
+    parseLuaString(current, shown);
+
+    const fs::path content(e.project.contentDir());
+    const auto rel = [&](const std::string& p) {
+        std::error_code ec;
+        const fs::path r = fs::path(p).lexically_relative(content);
+        return r.empty() ? p : r.generic_string();
+    };
+
+    bool changed = false;
+    ImGui::PushID(label);
+    ImGui::SetNextItemWidth(-1);
+    if (ImGui::BeginCombo("##behaviour", shown.empty() ? "(none)" : shown.c_str())) {
+        if (ImGui::Selectable("(none)", shown.empty())) {
+            out = fmtLuaString("");
+            changed = true;
+        }
+        for (const std::vector<std::string>* list :
+             {&e.project.limeFiles, &e.project.luaFiles})
+            for (const std::string& f : *list) {
+                if (list == &e.project.luaFiles && e.isGeneratedLua(f)) continue;
+                const std::string r = rel(f);
+                if (ImGui::Selectable(r.c_str(), r == shown)) {
+                    out = fmtLuaString(r);
+                    changed = true;
+                }
+            }
+        ImGui::EndCombo();
+    }
+    ImGui::PopID();
+    return changed;
+}
+
 std::string_view assetKind(const std::string& typeName) {
     constexpr std::string_view kPrefix = "Asset:";
     if (typeName.size() > kPrefix.size() &&
@@ -407,7 +444,9 @@ private:
                 changed = true;
             }
         } else if (const std::string_view kind = assetKind(p.typeName);
-                   !kind.empty() && kind != "Graph") {
+                   kind == "Graph" || kind == "Script") {
+            changed = drawBehaviourPicker(e, p.name.c_str(), cur, next);
+        } else if (!kind.empty()) {
             changed = drawAssetPicker(e, p.name.c_str(), kind, cur, next);
         } else if (p.typeName == "string" && parseLuaString(cur, str)) {
             char buf[512];

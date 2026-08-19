@@ -14,11 +14,11 @@ prop = [
 id       = "Behaviour"
 display  = "Behaviour"
 category = "Core"
-doc      = "Runs a .lime graph for this entity."
+doc      = "Runs a .lime graph or .lua script for this entity."
 color    = "7ec86aff"
 unique   = false
 prop = [
-  { name = "graph", type = "Asset:Graph", default = "\"\"", doc = "Path to the .lime graph, relative to content/." },
+  { name = "graph", type = "Asset:Graph", default = "\"\"", doc = "The .lime graph or .lua script to run, relative to content/." },
 ]
 
 [[component]]
