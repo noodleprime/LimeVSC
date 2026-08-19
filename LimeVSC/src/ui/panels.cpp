@@ -201,6 +201,7 @@ struct PendingLink {
 PendingLink g_pending;
 
 std::uint64_t g_lastHoveredLink = 0;
+bool g_hoverHeld = false;
 
 struct DragOrigin {
     std::uint32_t id;
@@ -373,7 +374,6 @@ public:
         syncPositions(e);
 
         const ed::NodeId hovered = ed::GetHoveredNode();
-        if (hovered) statusSetItemHover();
 
         ed::Suspend();
         drawHoverTooltip(e, hovered);
@@ -383,10 +383,16 @@ public:
         ed::End();
         canvasDl->Flags = savedAA;
 
-        if (const auto hl = ed::GetHoveredLink()) {
-            g_lastHoveredLink = static_cast<std::uint64_t>(hl.Get());
-            statusSetItemHover();
-        }
+        const ed::LinkId hoveredLink = ed::GetHoveredLink();
+        if (hoveredLink)
+            g_lastHoveredLink = static_cast<std::uint64_t>(hoveredLink.Get());
+
+        const bool overItem =
+            static_cast<bool>(hovered) || static_cast<bool>(hoveredLink);
+        const bool holding =
+            ImGui::IsMouseDown(ImGuiMouseButton_Left) || g_carry.active;
+        if (!holding) g_hoverHeld = overItem;
+        if (overItem || (holding && g_hoverHeld)) statusSetItemHover();
 
         splitLinkOnDoubleClick(e);
         updateWireCarry(e);
